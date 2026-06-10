@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img">
+  <title>Cuerate app icon</title>
+  <desc>Cuerate geometric C icon for app icon use</desc>
+
+  <!-- Background -->
+  <rect width="100" height="100" rx="22" fill="#0A0A0C"/>
+
+  <!-- Icon centred -->
+  <g transform="translate(50, 50)">
+    <!-- Bold C arc -->
+    <path d="M 18 -22 A 26 26 0 1 0 18 22" fill="none" stroke="#7C5CFC" stroke-width="6" stroke-linecap="round"/>
+    <!-- Top accent dot -->
+    <circle cx="18" cy="-22" r="5" fill="#7C5CFC"/>
+    <!-- Bottom accent dot -->
+    <circle cx="18" cy="22" r="5" fill="#AFA9EC"/>
+  </g>
+</svg>
