@@ -1,0 +1,10 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+supabase==2.4.3
+librosa==0.10.2
+numpy==1.26.4
+yt-dlp==2024.5.27
+soundfile==0.12.1
+# ffmpeg must be installed on the host OS:
+# apt-get install -y ffmpeg   (Debian/Ubuntu)
+# or include in your Dockerfile

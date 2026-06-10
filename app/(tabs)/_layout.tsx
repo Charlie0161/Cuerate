@@ -45,6 +45,10 @@ export default function TabLayout() {
         title: 'Mixes',
         tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline" color={color} size={size} />,
       }} />
+      <Tabs.Screen name="set-builder" options={{
+        title: 'Set Builder',
+        tabBarIcon: ({ color, size }) => <Ionicons name="musical-notes-outline" color={color} size={size} />,
+      }} />
       <Tabs.Screen name="gig-calc" options={{
         title: 'Gig Calc',
         tabBarIcon: ({ color, size }) => <Ionicons name="calculator-outline" color={color} size={size} />,
