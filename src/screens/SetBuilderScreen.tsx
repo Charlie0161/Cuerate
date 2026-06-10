@@ -15,6 +15,7 @@ import {
   calcHarmonicScore,
 } from '../store/setBuilderStore';
 import { useAuthStore } from '../store/authStore';
+import { AddTrackModal } from '../components/AddTrackModal';
 
 // ─── Design tokens (matches GigCalculatorScreen exactly) ─────────────────────
 
@@ -96,127 +97,6 @@ function Toggle({ value, onToggle }: { value: boolean; onToggle: () => void }) {
     <TouchableOpacity style={[s.toggleSwitch, value && s.toggleSwitchOn]} onPress={onToggle}>
       <View style={[s.toggleThumb, value && s.toggleThumbOn]} />
     </TouchableOpacity>
-  );
-}
-
-// ─── Add Track Modal ──────────────────────────────────────────────────────────
-
-interface AddTrackModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onAdd: (track: Omit<CrateTrack, 'id' | 'createdAt'>) => void;
-  prefill?: Partial<CrateTrack>; // used by Shazam integration later
-}
-
-function AddTrackModal({ visible, onClose, onAdd, prefill }: AddTrackModalProps) {
-  const [title, setTitle] = useState(prefill?.title ?? '');
-  const [artist, setArtist] = useState(prefill?.artist ?? '');
-  const [bpm, setBpm] = useState(prefill?.bpm?.toString() ?? '');
-  const [key, setKey] = useState<CamelotKey | ''>(prefill?.camelotKey ?? '');
-  const [energy, setEnergy] = useState(prefill?.energy?.toString() ?? '5');
-  const [keyPickerOpen, setKeyPickerOpen] = useState(false);
-
-  const reset = () => {
-    setTitle(''); setArtist(''); setBpm(''); setKey(''); setEnergy('5');
-  };
-
-  const handleAdd = () => {
-    if (!title.trim()) { Alert.alert('Missing field', 'Track title is required.'); return; }
-    const bpmInt = parseInt(bpm);
-    if (!bpmInt || bpmInt < 60 || bpmInt > 220) {
-      Alert.alert('Invalid BPM', 'BPM must be between 60 and 220.'); return;
-    }
-    if (!key) { Alert.alert('Missing field', 'Please select a Camelot key.'); return; }
-    const energyInt = Math.min(10, Math.max(1, parseInt(energy) || 5));
-    onAdd({ title: title.trim(), artist: artist.trim(), bpm: bpmInt, camelotKey: key, energy: energyInt, source: 'manual' });
-    reset();
-    onClose();
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <View style={s.modalHeader}>
-          <Text style={s.modalTitle}>Add track</Text>
-          <TouchableOpacity onPress={() => { reset(); onClose(); }}>
-            <Ionicons name="close" size={24} color={C.textSec} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-          <Text style={s.fieldLabel}>Title *</Text>
-          <TextInput style={s.fieldInput} value={title} onChangeText={setTitle}
-            placeholder="Track title" placeholderTextColor={C.textMuted} />
-
-          <Text style={s.fieldLabel}>Artist</Text>
-          <TextInput style={s.fieldInput} value={artist} onChangeText={setArtist}
-            placeholder="Artist name" placeholderTextColor={C.textMuted} />
-
-          <View style={s.twoCol}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>BPM *</Text>
-              <TextInput style={s.fieldInput} value={bpm} onChangeText={setBpm}
-                keyboardType="number-pad" placeholder="128" placeholderTextColor={C.textMuted} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Energy (1–10)</Text>
-              <TextInput style={s.fieldInput} value={energy} onChangeText={setEnergy}
-                keyboardType="number-pad" placeholder="5" placeholderTextColor={C.textMuted} />
-            </View>
-          </View>
-
-          <Text style={s.fieldLabel}>Camelot key *</Text>
-          <TouchableOpacity style={s.keyPickerBtn} onPress={() => setKeyPickerOpen(!keyPickerOpen)}>
-            {key ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <KeyBadge camelotKey={key} />
-                <Text style={{ color: C.text, fontSize: 14 }}>{KEY_NAMES[key]}</Text>
-              </View>
-            ) : (
-              <Text style={{ color: C.textMuted, fontSize: 14 }}>Select key…</Text>
-            )}
-            <Ionicons name={keyPickerOpen ? 'chevron-up' : 'chevron-down'} size={16} color={C.textSec} />
-          </TouchableOpacity>
-
-          {keyPickerOpen && (
-            <View style={s.keyGrid}>
-              {(['A', 'B'] as const).map(letter => (
-                <View key={letter} style={{ marginBottom: 8 }}>
-                  <Text style={s.keyGroupLabel}>{letter === 'A' ? 'Minor (A)' : 'Major (B)'}</Text>
-                  <View style={s.keyRow}>
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const k = `${i + 1}${letter}` as CamelotKey;
-                      const col = keyColor(k);
-                      const selected = key === k;
-                      return (
-                        <TouchableOpacity
-                          key={k}
-                          style={[s.keyOption, { backgroundColor: col + '22', borderColor: selected ? col : col + '44' }, selected && { borderWidth: 2 }]}
-                          onPress={() => { setKey(k); setKeyPickerOpen(false); }}
-                        >
-                          <Text style={[s.keyOptionText, { color: col }]}>{k}</Text>
-                          <Text style={[s.keyOptionSub, { color: col + 'AA' }]}>{KEY_NAMES[k]}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={[s.twoCol, { marginTop: 24 }]}>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => { reset(); onClose(); }}>
-              <Text style={s.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.confirmBtn} onPress={handleAdd}>
-              <Ionicons name="add-circle" size={16} color={C.accent} style={{ marginRight: 6 }} />
-              <Text style={s.confirmBtnText}>Add to crate</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
   );
 }
 
