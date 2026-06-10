@@ -15,6 +15,7 @@ const C = {
   critical: '#FF4D4D', criticalBg: '#1F0E0E',
   success: '#4DCC8F', successBg: '#071A0F',
   warning: '#F5A623',
+  info: '#4DB8FF',
   text: '#F0EFF8', textSec: '#8A89A0', textMuted: '#52516A',
   soundcloud: '#FF5500', mixcloud: '#52AAD8', youtube: '#FF0000',
 };
@@ -55,6 +56,37 @@ type Comment = {
   profiles?: { dj_name: string | null };
 };
 
+type TrackItem = {
+  id: string;
+  title: string;
+  artist: string | null;
+  bpm: number | null;
+  camelot_key: string | null;
+  musical_key: string | null;
+  energy: number | null;
+  platform: string;
+  external_url: string;
+  thumbnail_url: string | null;
+  created_at: string;
+  dj_name?: string | null;
+  _kind: 'track_submission';
+};
+
+type FeedItem = (Mix & { _kind: 'mix' }) | TrackItem;
+
+const KEY_HUE: Record<string, string> = {
+  '1':'#7C5CFC','2':'#9B59FC','3':'#B05AF5','4':'#C86EF0','5':'#D97BE8','6':'#E88CE0',
+  '7':'#F49CD6','8':'#E8A0C8','9':'#D4A8D0','10':'#C0B0D8','11':'#AAB8E0','12':'#94C0E8',
+};
+const KEY_HUE_B: Record<string, string> = {
+  '1':'#5C9CFC','2':'#5CB8FC','3':'#4CCCE0','4':'#3DDCC0','5':'#40DCA0','6':'#52E080',
+  '7':'#6AE060','8':'#8EE040','9':'#B8E040','10':'#DCE040','11':'#ECC840','12':'#F0A040',
+};
+function keyColor(k: string): string {
+  const num = k.replace(/[AB]/, '');
+  return k.endsWith('A') ? KEY_HUE[num] ?? C.accent : KEY_HUE_B[num] ?? C.info;
+}
+
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
@@ -62,6 +94,91 @@ function timeAgo(date: string) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+
+// ─── Track Submission Card ────────────────────────────────────────────────────
+function TrackCard({ track }: { track: TrackItem }) {
+  const platformColor = PLATFORM_COLORS[track.platform] ?? C.textMuted;
+  const col = track.camelot_key ? keyColor(track.camelot_key) : C.accent;
+  const energyInt = track.energy ? Math.round(track.energy * 10) : null;
+
+  return (
+    <TouchableOpacity
+      style={[mc.card, { borderColor: col + '33' }]}
+      onPress={() => Linking.openURL(track.external_url)}
+      activeOpacity={0.8}
+    >
+      {/* Badges */}
+      <View style={mc.badgeRow}>
+        <View style={[mc.badge, { backgroundColor: platformColor + '20', borderColor: platformColor + '50' }]}>
+          <Text style={[mc.badgeText, { color: platformColor }]}>{PLATFORM_LABELS[track.platform] ?? track.platform}</Text>
+        </View>
+        <View style={[mc.badge, { backgroundColor: C.successBg, borderColor: C.success + '40' }]}>
+          <Text style={[mc.badgeText, { color: C.success }]}>Track</Text>
+        </View>
+        {track.camelot_key && (
+          <View style={[mc.badge, { backgroundColor: col + '18', borderColor: col + '44' }]}>
+            <Text style={[mc.badgeText, { color: col }]}>{track.camelot_key}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Title */}
+      <Text style={mc.title}>{track.title}</Text>
+
+      {/* Artist + time */}
+      <View style={mc.djRow}>
+        {track.artist ? (
+          <>
+            <View style={mc.djAvatar}>
+              <Text style={mc.djAvatarText}>{track.artist[0].toUpperCase()}</Text>
+            </View>
+            <Text style={mc.djName}>{track.artist}</Text>
+          </>
+        ) : (
+          <Text style={mc.djName}>Unknown artist</Text>
+        )}
+        <Text style={mc.time}>{timeAgo(track.created_at)}</Text>
+      </View>
+
+      {/* BPM + key + energy row */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        {track.bpm && (
+          <View style={[mc.badge, { backgroundColor: C.raised, borderColor: C.border }]}>
+            <Text style={[mc.badgeText, { color: C.textSec }]}>🎚 {track.bpm} BPM</Text>
+          </View>
+        )}
+        {track.camelot_key && track.musical_key && (
+          <View style={[mc.badge, { backgroundColor: col + '18', borderColor: col + '33' }]}>
+            <Text style={[mc.badgeText, { color: col }]}>{track.musical_key} ({track.camelot_key})</Text>
+          </View>
+        )}
+        {energyInt !== null && (
+          <View style={[mc.badge, { backgroundColor: C.raised, borderColor: C.border }]}>
+            <Text style={[mc.badgeText, { color: C.textMuted }]}>Energy {energyInt}/10</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Submitted by */}
+      {track.dj_name && (
+        <Text style={[mc.bpm, { marginBottom: 10 }]}>Added by {track.dj_name}</Text>
+      )}
+
+      {/* Actions */}
+      <View style={mc.actions}>
+        <TouchableOpacity style={mc.actionBtn} onPress={() => Linking.openURL(track.external_url)}>
+          <Ionicons name="play-circle-outline" size={16} color={C.textSec} />
+          <Text style={mc.actionText}>Play</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={mc.actionBtn} onPress={() => Linking.openURL('https://cuerate.co.uk/tracks')}>
+          <Ionicons name="open-outline" size={15} color={C.textSec} />
+          <Text style={mc.actionText}>View</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 // ─── Mix Card ────────────────────────────────────────────────────────────────
@@ -232,7 +349,7 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function MixesScreen() {
   const { session } = useAuthStore();
-  const [mixes, setMixes] = useState<Mix[]>([]);
+  const [mixes, setMixes] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'set' | 'track'>('all');
@@ -240,14 +357,38 @@ export default function MixesScreen() {
   const [search, setSearch] = useState('');
 
   const fetchMixes = useCallback(async () => {
-    let query = supabase
+    // Fetch mixes and track submissions in parallel
+    let mixQuery = supabase
       .from('mix_feed')
       .select('*')
       .order('created_at', { ascending: false });
-    if (filter !== 'all') query = query.eq('type', filter);
-    if (genre !== 'All') query = query.eq('genre', genre);
-    const { data } = await query;
-    setMixes(data ?? []);
+    if (filter === 'set') mixQuery = mixQuery.eq('type', 'set');
+    if (filter === 'track') mixQuery = mixQuery.eq('type', 'track');
+    if (genre !== 'All') mixQuery = mixQuery.eq('genre', genre);
+
+    const [mixRes, trackRes] = await Promise.all([
+      mixQuery,
+      filter === 'set' ? Promise.resolve({ data: [] }) :
+        supabase
+          .from('track_submissions')
+          .select('id, title, artist, bpm, camelot_key, musical_key, energy, platform, external_url, thumbnail_url, created_at, status, profiles:submitted_by(dj_name)')
+          .eq('status', 'ready')
+          .order('created_at', { ascending: false })
+          .limit(50),
+    ]);
+
+    const mixes: FeedItem[] = (mixRes.data ?? []).map((m: any) => ({ ...m, _kind: 'mix' as const }));
+    const tracks: FeedItem[] = (trackRes.data ?? []).map((t: any) => ({
+      ...t,
+      dj_name: t.profiles?.dj_name ?? null,
+      _kind: 'track_submission' as const,
+    }));
+
+    // Merge and sort by created_at descending
+    const merged = [...mixes, ...tracks].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    setMixes(merged);
     setLoading(false);
     setRefreshing(false);
   }, [filter, genre]);
@@ -255,11 +396,14 @@ export default function MixesScreen() {
   useEffect(() => { fetchMixes(); }, [fetchMixes]);
 
   const filtered = search
-    ? mixes.filter(m =>
-        m.title.toLowerCase().includes(search.toLowerCase()) ||
-        m.dj_name?.toLowerCase().includes(search.toLowerCase()) ||
-        m.genre?.toLowerCase().includes(search.toLowerCase())
-      )
+    ? mixes.filter(m => {
+        const q = search.toLowerCase();
+        const titleMatch = m.title.toLowerCase().includes(q);
+        const djMatch = (m.dj_name ?? '').toLowerCase().includes(q);
+        const genreMatch = m._kind === 'mix' ? (m.genre ?? '').toLowerCase().includes(q) : false;
+        const artistMatch = m._kind === 'track_submission' ? (m.artist ?? '').toLowerCase().includes(q) : false;
+        return titleMatch || djMatch || genreMatch || artistMatch;
+      })
     : mixes;
 
   return (
@@ -347,7 +491,9 @@ export default function MixesScreen() {
             />
           }
           renderItem={({ item }) => (
-            <MixCard mix={item} session={session} onRefresh={fetchMixes} />
+            item._kind === 'track_submission'
+              ? <TrackCard track={item as TrackItem} />
+              : <MixCard mix={item as Mix & { _kind: 'mix' }} session={session} onRefresh={fetchMixes} />
           )}
         />
       )}
