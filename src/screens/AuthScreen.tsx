@@ -79,7 +79,7 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
     setError('');
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'boothbuddy://reset-password',
+        redirectTo: 'cuerate://reset-password',
       });
       if (error) throw error;
       setSuccess('Password reset link sent. Check your email.');
@@ -132,7 +132,7 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
             <View style={s.logoIcon}>
               <Ionicons name="musical-notes" size={32} color={C.accent} />
             </View>
-            <Text style={s.logoText}>BoothBuddy</Text>
+            <Text style={s.logoText}>Cuerate</Text>
             <Text style={s.logoSub}>The all-in-one DJ companion</Text>
           </View>
 
@@ -254,7 +254,7 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
           </View>
 
           <Text style={s.legalText}>
-            By continuing you agree to BoothBuddy's Terms of Service and Privacy Policy.
+            By continuing you agree to Cuerate's Terms of Service and Privacy Policy.
             Your data is stored securely and never sold.
           </Text>
 

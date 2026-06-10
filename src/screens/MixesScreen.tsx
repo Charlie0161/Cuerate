@@ -178,7 +178,7 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
           <Ionicons name="chatbubble-outline" size={15} color={showComments ? C.accent : C.textSec} />
           <Text style={[mc.actionText, showComments && { color: C.accent }]}>{mix.comment_count ?? 0}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={mc.actionBtn} onPress={() => Linking.openURL(`https://boothbuddy-web.vercel.app`)}>
+        <TouchableOpacity style={mc.actionBtn} onPress={() => Linking.openURL(`https://cuerate.co.uk`)}>
           <Ionicons name="open-outline" size={15} color={C.textSec} />
           <Text style={mc.actionText}>Web</Text>
         </TouchableOpacity>
@@ -274,7 +274,7 @@ export default function MixesScreen() {
         </View>
         <TouchableOpacity
           style={s.webBtn}
-          onPress={() => Linking.openURL('https://boothbuddy-web.vercel.app')}>
+          onPress={() => Linking.openURL('https://cuerate.co.uk')}>
           <Ionicons name="globe-outline" size={14} color={C.accent} />
           <Text style={s.webBtnText}>Web</Text>
         </TouchableOpacity>
@@ -330,7 +330,7 @@ export default function MixesScreen() {
           <Ionicons name="musical-notes-outline" size={48} color={C.textMuted} />
           <Text style={s.emptyTitle}>{search ? 'No results found' : 'No mixes yet'}</Text>
           <Text style={s.emptyBody}>
-            {search ? 'Try a different search' : 'Be first to share a mix at boothbuddy-web.vercel.app'}
+            {search ? 'Try a different search' : 'Be first to share a mix at cuerate.co.uk'}
           </Text>
         </View>
       ) : (
