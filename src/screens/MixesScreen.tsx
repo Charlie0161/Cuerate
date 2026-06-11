@@ -348,16 +348,26 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function MixesScreen() {
-  const { session } = useAuthStore();
+  const { session, user } = useAuthStore();
   const [mixes, setMixes] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'set' | 'track'>('all');
   const [genre, setGenre] = useState('All');
   const [search, setSearch] = useState('');
+  const [feedMode, setFeedMode] = useState<'forYou' | 'following'>('forYou');
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id)
+      .then(({ data }) => setFollowingIds((data ?? []).map((r: any) => r.following_id)));
+  }, [user]);
 
   const fetchMixes = useCallback(async () => {
-    // Fetch mixes and track submissions in parallel
     let mixQuery = supabase
       .from('mix_feed')
       .select('*')
@@ -365,33 +375,39 @@ export default function MixesScreen() {
     if (filter === 'set') mixQuery = mixQuery.eq('type', 'set');
     if (filter === 'track') mixQuery = mixQuery.eq('type', 'track');
     if (genre !== 'All') mixQuery = mixQuery.eq('genre', genre);
+    if (feedMode === 'following' && followingIds.length > 0) {
+      mixQuery = mixQuery.in('user_id', followingIds);
+    }
 
     const [mixRes, trackRes] = await Promise.all([
       mixQuery,
       filter === 'set' ? Promise.resolve({ data: [] }) :
         supabase
           .from('track_submissions')
-          .select('id, title, artist, bpm, camelot_key, musical_key, energy, platform, external_url, thumbnail_url, created_at, status, profiles:submitted_by(dj_name)')
+          .select('id, title, artist, bpm, camelot_key, musical_key, energy, platform, external_url, thumbnail_url, created_at, status, profiles:submitted_by(dj_name, id)')
           .eq('status', 'ready')
           .order('created_at', { ascending: false })
           .limit(50),
     ]);
 
-    const mixes: FeedItem[] = (mixRes.data ?? []).map((m: any) => ({ ...m, _kind: 'mix' as const }));
-    const tracks: FeedItem[] = (trackRes.data ?? []).map((t: any) => ({
+    let mixes: FeedItem[] = (mixRes.data ?? []).map((m: any) => ({ ...m, _kind: 'mix' as const }));
+    let tracks: FeedItem[] = (trackRes.data ?? []).map((t: any) => ({
       ...t,
       dj_name: t.profiles?.dj_name ?? null,
       _kind: 'track_submission' as const,
     }));
 
-    // Merge and sort by created_at descending
+    if (feedMode === 'following' && followingIds.length > 0) {
+      tracks = tracks.filter((t: any) => followingIds.includes(t.profiles?.id));
+    }
+
     const merged = [...mixes, ...tracks].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
     setMixes(merged);
     setLoading(false);
     setRefreshing(false);
-  }, [filter, genre]);
+  }, [filter, genre, feedMode, followingIds]);
 
   useEffect(() => { fetchMixes(); }, [fetchMixes]);
 
@@ -421,6 +437,22 @@ export default function MixesScreen() {
           onPress={() => Linking.openURL('https://cuerate.co.uk')}>
           <Ionicons name="globe-outline" size={14} color={C.accent} />
           <Text style={s.webBtnText}>Web</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Feed mode switcher */}
+      <View style={s.feedSwitcher}>
+        <TouchableOpacity
+          style={[s.feedTab, feedMode === 'forYou' && s.feedTabActive]}
+          onPress={() => setFeedMode('forYou')}
+        >
+          <Text style={[s.feedTabText, feedMode === 'forYou' && s.feedTabTextActive]}>For You</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.feedTab, feedMode === 'following' && s.feedTabActive]}
+          onPress={() => setFeedMode('following')}
+        >
+          <Text style={[s.feedTabText, feedMode === 'following' && s.feedTabTextActive]}>Following</Text>
         </TouchableOpacity>
       </View>
 
@@ -469,12 +501,24 @@ export default function MixesScreen() {
       {/* Feed */}
       {loading ? (
         <ActivityIndicator size="large" color={C.accent} style={{ marginTop: 60 }} />
+      ) : feedMode === 'following' && !session ? (
+        <View style={s.empty}>
+          <Ionicons name="person-outline" size={48} color={C.textMuted} />
+          <Text style={s.emptyTitle}>Sign in to see your feed</Text>
+          <Text style={s.emptyBody}>Follow DJs to see their latest mixes here.</Text>
+        </View>
+      ) : feedMode === 'following' && followingIds.length === 0 ? (
+        <View style={s.empty}>
+          <Ionicons name="people-outline" size={48} color={C.textMuted} />
+          <Text style={s.emptyTitle}>No one followed yet</Text>
+          <Text style={s.emptyBody}>Head to the Directory and follow some DJs to see their mixes here.</Text>
+        </View>
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
           <Ionicons name="musical-notes-outline" size={48} color={C.textMuted} />
-          <Text style={s.emptyTitle}>{search ? 'No results found' : 'No mixes yet'}</Text>
+          <Text style={s.emptyTitle}>{search ? 'No results found' : feedMode === 'following' ? 'No mixes from people you follow yet' : 'No mixes yet'}</Text>
           <Text style={s.emptyBody}>
-            {search ? 'Try a different search' : 'Be first to share a mix at cuerate.co.uk'}
+            {search ? 'Try a different search' : feedMode === 'following' ? 'The DJs you follow haven\'t posted any mixes yet.' : 'Be first to share a mix at cuerate.co.uk'}
           </Text>
         </View>
       ) : (
@@ -519,6 +563,11 @@ const s = StyleSheet.create({
   genrePill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: C.border },
   genrePillActive: { borderColor: C.accent, backgroundColor: C.accentDim + '20' },
   genrePillText: { fontSize: 12, fontWeight: '600', color: C.textMuted },
+  feedSwitcher: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 3 },
+  feedTab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  feedTabActive: { backgroundColor: C.accent },
+  feedTabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  feedTabTextActive: { color: '#fff' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text, marginTop: 14, marginBottom: 6 },
   emptyBody: { fontSize: 14, color: C.textSec, textAlign: 'center', lineHeight: 21 },
