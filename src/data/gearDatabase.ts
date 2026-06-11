@@ -39,6 +39,8 @@ export interface GearItem {
   os?: 'mac' | 'windows' | 'ios' | 'android';
   softwareCompatibility?: string[];
   cpuWarning?: boolean;
+  // Retailer buy link (append affiliate param when available)
+  buyUrl?: string;
 }
 
 export interface CompatibilityWarning {
@@ -61,6 +63,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxBitDepth: 24,
     standaloneCompatible: false,
     notes: 'USB bus powered. Requires laptop/PC.',
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_ddj_flx4.htm',
   },
   {
     id: 'pioneer-ddj-flx6',
@@ -72,6 +75,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxSampleRate: 48000,
     maxBitDepth: 24,
     standaloneCompatible: false,
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_ddj_flx6_gt.htm',
   },
   {
     id: 'pioneer-ddj-rev7',
@@ -83,6 +87,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxSampleRate: 96000,
     maxBitDepth: 24,
     standaloneCompatible: false,
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_ddj_rev7.htm',
   },
   {
     id: 'pioneer-ddj-sb3',
@@ -94,6 +99,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxSampleRate: 44100,
     maxBitDepth: 16,
     standaloneCompatible: false,
+    buyUrl: 'https://www.amazon.co.uk/s?k=Pioneer+DDJ-SB3',
   },
   {
     id: 'pioneer-ddj-400',
@@ -105,6 +111,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxSampleRate: 44100,
     maxBitDepth: 24,
     standaloneCompatible: false,
+    buyUrl: 'https://www.amazon.co.uk/s?k=Pioneer+DDJ-400',
   },
   {
     id: 'denon-mcx8000',
@@ -116,6 +123,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxSampleRate: 96000,
     maxBitDepth: 24,
     standaloneCompatible: true,
+    buyUrl: 'https://www.amazon.co.uk/s?k=Denon+MCX8000',
   },
   {
     id: 'native-instruments-traktor-s4',
@@ -129,6 +137,7 @@ export const GEAR_DATABASE: GearItem[] = [
     standaloneCompatible: false,
     warningFlags: ['traktor-only'],
     notes: 'Requires Traktor Pro software. Not compatible with Serato or rekordbox.',
+    buyUrl: 'https://www.thomann.de/gb/native_instruments_traktor_kontrol_s4_mk3.htm',
   },
   {
     id: 'rane-one',
@@ -142,6 +151,7 @@ export const GEAR_DATABASE: GearItem[] = [
     standaloneCompatible: false,
     warningFlags: ['serato-only'],
     notes: 'Serato DJ Pro only.',
+    buyUrl: 'https://www.thomann.de/gb/rane_one.htm',
   },
   // ── CDJ / Standalone ────────────────────────────────────────────────────
   {
@@ -156,6 +166,7 @@ export const GEAR_DATABASE: GearItem[] = [
     standaloneCompatible: true,
     warningFlags: ['no-32bit', 'no-vbr-mp3'],
     notes: 'Standalone. Does NOT load 32-bit WAV or VBR MP3.',
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_xdj_rx3.htm',
   },
   {
     id: 'pioneer-xdj-xz',
@@ -168,6 +179,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxBitDepth: 24,
     standaloneCompatible: true,
     warningFlags: ['no-32bit', 'no-vbr-mp3'],
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_xdj_xz.htm',
   },
   {
     id: 'pioneer-cdj-3000',
@@ -180,6 +192,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxBitDepth: 24,
     standaloneCompatible: true,
     warningFlags: ['no-32bit', 'no-vbr-mp3'],
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_cdj_3000.htm',
   },
   {
     id: 'denon-sc6000',
@@ -192,6 +205,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxBitDepth: 32,
     standaloneCompatible: true,
     notes: 'Supports 32-bit audio. No VBR restrictions.',
+    buyUrl: 'https://www.thomann.de/gb/denon_dj_sc6000m.htm',
   },
   {
     id: 'denon-sc5000',
@@ -203,6 +217,7 @@ export const GEAR_DATABASE: GearItem[] = [
     maxSampleRate: 96000,
     maxBitDepth: 32,
     standaloneCompatible: true,
+    buyUrl: 'https://www.thomann.de/gb/denon_dj_sc5000m.htm',
   },
   // ── Mixers ──────────────────────────────────────────────────────────────
   {
@@ -214,6 +229,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['xlr', 'rca', 'trs', 'phono', 'usb'],
     maxSampleRate: 96000,
     maxBitDepth: 24,
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_djm_900nxs2.htm',
   },
   {
     id: 'pioneer-djm-750mk2',
@@ -224,6 +240,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['xlr', 'rca', 'trs', 'phono', 'usb'],
     maxSampleRate: 96000,
     maxBitDepth: 24,
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_djm_750mk2.htm',
   },
   {
     id: 'pioneer-djm-s9',
@@ -234,6 +251,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['xlr', 'rca', 'trs', 'phono', 'usb'],
     maxSampleRate: 96000,
     maxBitDepth: 24,
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_djm_s9.htm',
   },
   {
     id: 'allen-heath-xone96',
@@ -244,6 +262,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['xlr', 'rca', 'trs', 'phono'],
     maxSampleRate: 96000,
     maxBitDepth: 24,
+    buyUrl: 'https://www.thomann.de/gb/allen___heath_xone_96.htm',
   },
   {
     id: 'allen-heath-xone43',
@@ -252,6 +271,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'mixer',
     powerDraw: 40,
     connections: ['xlr', 'rca', 'trs', 'phono'],
+    buyUrl: 'https://www.thomann.de/gb/allen___heath_xone_43c.htm',
   },
   {
     id: 'rane-mp2015',
@@ -262,6 +282,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['xlr', 'rca', 'trs', 'phono'],
     maxSampleRate: 96000,
     maxBitDepth: 24,
+    buyUrl: 'https://www.thomann.de/gb/rane_mp2015r.htm',
   },
   // ── Studio Monitors ─────────────────────────────────────────────────────
   {
@@ -273,6 +294,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['rca', 'trs', 'optical', 'bluetooth'],
     warningFlags: ['bluetooth-latency'],
     notes: 'Bluetooth adds ~150ms latency. Use RCA or TRS for live play.',
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_dm_40d_bt.htm',
   },
   {
     id: 'pioneer-dm-50d',
@@ -282,6 +304,7 @@ export const GEAR_DATABASE: GearItem[] = [
     powerDraw: 60,
     connections: ['rca', 'trs', 'optical', 'bluetooth'],
     warningFlags: ['bluetooth-latency'],
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_dm_50d_bt.htm',
   },
   {
     id: 'yamaha-hs5',
@@ -291,6 +314,7 @@ export const GEAR_DATABASE: GearItem[] = [
     powerDraw: 70,
     connections: ['xlr', 'trs'],
     notes: 'Studio reference monitor. Flat frequency response.',
+    buyUrl: 'https://www.thomann.de/gb/yamaha_hs_5.htm',
   },
   {
     id: 'yamaha-hs7',
@@ -299,6 +323,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'speaker',
     powerDraw: 95,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/yamaha_hs_7.htm',
   },
   {
     id: 'krk-rokit-5',
@@ -307,6 +332,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'speaker',
     powerDraw: 55,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/krk_rokit_5_g4.htm',
   },
   {
     id: 'adam-t5v',
@@ -315,6 +341,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'speaker',
     powerDraw: 70,
     connections: ['xlr', 'trs', 'rca'],
+    buyUrl: 'https://www.thomann.de/gb/adam_audio_t5v.htm',
   },
   // ── PA Speakers ─────────────────────────────────────────────────────────
   {
@@ -325,6 +352,7 @@ export const GEAR_DATABASE: GearItem[] = [
     powerDraw: 1000,
     connections: ['xlr', 'trs'],
     notes: 'Pro PA speaker. 126dB SPL.',
+    buyUrl: 'https://www.thomann.de/gb/electro_voice_zlx_12p_g2.htm',
   },
   {
     id: 'mackie-thump15a',
@@ -333,6 +361,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'speaker',
     powerDraw: 1300,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/mackie_thump15a_mk3.htm',
   },
   {
     id: 'yamaha-dxr15',
@@ -341,6 +370,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'speaker',
     powerDraw: 1100,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/yamaha_dxr15mkii.htm',
   },
   {
     id: 'qsc-k12-2',
@@ -350,6 +380,7 @@ export const GEAR_DATABASE: GearItem[] = [
     powerDraw: 2000,
     connections: ['xlr', 'trs'],
     notes: '2000W peak. Suitable for large venues.',
+    buyUrl: 'https://www.thomann.de/gb/qsc_k12_2.htm',
   },
   {
     id: 'rcf-art-745a',
@@ -358,6 +389,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'speaker',
     powerDraw: 1400,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/rcf_art_745_a_mk4.htm',
   },
   // ── Subwoofers ──────────────────────────────────────────────────────────
   {
@@ -367,6 +399,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'subwoofer',
     powerDraw: 1300,
     connections: ['xlr'],
+    buyUrl: 'https://www.thomann.de/gb/electro_voice_ekx_18sp.htm',
   },
   {
     id: 'mackie-thump118s',
@@ -375,6 +408,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'subwoofer',
     powerDraw: 1400,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/mackie_thump_118s_mk3.htm',
   },
   {
     id: 'qsc-ksub',
@@ -383,6 +417,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'subwoofer',
     powerDraw: 1000,
     connections: ['xlr'],
+    buyUrl: 'https://www.thomann.de/gb/qsc_ksub.htm',
   },
   {
     id: 'rcf-sub-705',
@@ -391,6 +426,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'subwoofer',
     powerDraw: 1400,
     connections: ['xlr'],
+    buyUrl: 'https://www.thomann.de/gb/rcf_sub_705_as_mk3.htm',
   },
   // ── Soundbars ───────────────────────────────────────────────────────────
   {
@@ -402,6 +438,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['hdmi', 'optical', 'bluetooth'],
     warningFlags: ['bluetooth-latency', 'consumer-audio', 'no-xlr'],
     notes: 'Consumer soundbar. Not designed for DJ monitoring.',
+    buyUrl: 'https://www.amazon.co.uk/s?k=Samsung+HW-T420+soundbar',
   },
   {
     id: 'sonos-beam',
@@ -412,6 +449,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['hdmi', 'optical'],
     warningFlags: ['consumer-audio', 'no-xlr', 'high-processing-latency'],
     notes: 'DSP processing introduces 20–70ms latency even on optical.',
+    buyUrl: 'https://www.sonos.com/en-gb/shop/beam',
   },
   // ── Headphones ──────────────────────────────────────────────────────────
   {
@@ -424,6 +462,7 @@ export const GEAR_DATABASE: GearItem[] = [
     impedanceOhms: 32,
     driverMm: 50,
     notes: 'Professional DJ headphone. 5Hz–40kHz response.',
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_hdj_x10.htm',
   },
   {
     id: 'pioneer-hdj-x7',
@@ -434,6 +473,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['trs'],
     impedanceOhms: 32,
     driverMm: 40,
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_hdj_x7.htm',
   },
   {
     id: 'pioneer-hdj-cue1',
@@ -445,6 +485,7 @@ export const GEAR_DATABASE: GearItem[] = [
     impedanceOhms: 32,
     driverMm: 36,
     notes: 'Entry-level DJ headphone.',
+    buyUrl: 'https://www.thomann.de/gb/pioneer_dj_hdj_cue1.htm',
   },
   {
     id: 'sennheiser-hd25',
@@ -457,6 +498,7 @@ export const GEAR_DATABASE: GearItem[] = [
     driverMm: 25,
     notes: 'Industry standard. Requires decent headphone amp output.',
     warningFlags: ['high-impedance'],
+    buyUrl: 'https://www.thomann.de/gb/sennheiser_hd_25.htm',
   },
   {
     id: 'sony-mdr-7506',
@@ -469,6 +511,7 @@ export const GEAR_DATABASE: GearItem[] = [
     driverMm: 40,
     notes: 'Studio monitoring standard. Not specifically DJ-tuned.',
     warningFlags: ['high-impedance'],
+    buyUrl: 'https://www.thomann.de/gb/sony_mdr_7506.htm',
   },
   {
     id: 'audio-technica-ath-m50x',
@@ -479,6 +522,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['trs'],
     impedanceOhms: 38,
     driverMm: 45,
+    buyUrl: 'https://www.thomann.de/gb/audio_technica_ath_m50x.htm',
   },
   {
     id: 'shure-srh840a',
@@ -489,6 +533,7 @@ export const GEAR_DATABASE: GearItem[] = [
     connections: ['trs'],
     impedanceOhms: 44,
     driverMm: 40,
+    buyUrl: 'https://www.thomann.de/gb/shure_srh840a.htm',
   },
   {
     id: 'beyerdynamic-dt770',
@@ -501,6 +546,7 @@ export const GEAR_DATABASE: GearItem[] = [
     driverMm: 45,
     notes: 'Studio headphone. 250Ω version requires dedicated headphone amp.',
     warningFlags: ['high-impedance', 'needs-amp'],
+    buyUrl: 'https://www.thomann.de/gb/beyerdynamic_dt_770_pro_250_ohm.htm',
   },
   {
     id: 'v-moda-crossfade2',
@@ -513,6 +559,7 @@ export const GEAR_DATABASE: GearItem[] = [
     driverMm: 50,
     warningFlags: ['bluetooth-latency'],
     notes: 'Use wired mode only for DJ monitoring. Bluetooth adds latency.',
+    buyUrl: 'https://www.thomann.de/gb/v_moda_crossfade_2_wireless.htm',
   },
   // ── Laptops & Devices ───────────────────────────────────────────────────
   {
@@ -525,6 +572,7 @@ export const GEAR_DATABASE: GearItem[] = [
     os: 'mac',
     softwareCompatibility: ['Serato DJ Pro', 'rekordbox', 'Traktor Pro', 'Virtual DJ', 'Ableton Live'],
     notes: 'Best DJ laptop. USB-C only — needs USB-A hub for older controllers.',
+    buyUrl: 'https://www.apple.com/uk/shop/buy-mac/macbook-pro',
   },
   {
     id: 'macbook-air-m2',
@@ -537,6 +585,7 @@ export const GEAR_DATABASE: GearItem[] = [
     softwareCompatibility: ['Serato DJ Pro', 'rekordbox', 'Traktor Pro', 'Virtual DJ'],
     notes: 'No fan — may throttle under sustained heavy load at high sample rates.',
     warningFlags: ['thermal-throttle'],
+    buyUrl: 'https://www.apple.com/uk/shop/buy-mac/macbook-air',
   },
   {
     id: 'windows-laptop-modern',
@@ -549,6 +598,7 @@ export const GEAR_DATABASE: GearItem[] = [
     softwareCompatibility: ['Serato DJ Pro', 'rekordbox', 'Traktor Pro', 'Virtual DJ', 'Ableton Live'],
     notes: 'Install ASIO4ALL driver for low-latency audio on Windows.',
     warningFlags: ['needs-asio'],
+    buyUrl: 'https://www.currys.co.uk/laptops.html',
   },
   {
     id: 'windows-laptop-old',
@@ -574,6 +624,7 @@ export const GEAR_DATABASE: GearItem[] = [
     softwareCompatibility: ['djay Pro', 'edjing Mix', 'rekordbox (limited)'],
     warningFlags: ['no-serato', 'no-traktor', 'limited-software'],
     notes: 'Serato and Traktor are not available on iPad. Most Pioneer controllers are not iPad-compatible.',
+    buyUrl: 'https://www.apple.com/uk/shop/buy-ipad/ipad-pro',
   },
   {
     id: 'ipad-standard',
@@ -586,6 +637,7 @@ export const GEAR_DATABASE: GearItem[] = [
     softwareCompatibility: ['djay Pro', 'edjing Mix'],
     warningFlags: ['no-serato', 'no-traktor', 'limited-software', 'cpu-warning'],
     notes: 'Limited DJ software support. Not recommended for professional use.',
+    buyUrl: 'https://www.apple.com/uk/shop/buy-ipad',
   },
   // ── Amplifiers ──────────────────────────────────────────────────────────
   {
@@ -596,6 +648,7 @@ export const GEAR_DATABASE: GearItem[] = [
     powerDraw: 525,
     connections: ['xlr', 'trs'],
     notes: '525W per channel. Used with passive PA speakers.',
+    buyUrl: 'https://www.thomann.de/gb/crown_xls_1502.htm',
   },
   {
     id: 'qsc-gx5',
@@ -604,6 +657,7 @@ export const GEAR_DATABASE: GearItem[] = [
     category: 'amplifier',
     powerDraw: 500,
     connections: ['xlr', 'trs'],
+    buyUrl: 'https://www.thomann.de/gb/qsc_gx5.htm',
   },
 ];
 

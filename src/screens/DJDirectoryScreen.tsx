@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import DJProfileModal from './DJProfileModal';
 import VenueDirectoryScreen from './VenueDirectoryScreen';
+import MarketplaceScreen from './MarketplaceScreen';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ export default function DJDirectoryScreen() {
   const [search, setSearch]       = useState('');
   const [genre, setGenre]         = useState('All');
   const [selectedDJ, setSelectedDJ] = useState<DJProfile | null>(null);
-  const [directoryTab, setDirectoryTab] = useState<'djs' | 'venues'>('djs');
+  const [directoryTab, setDirectoryTab] = useState<'djs' | 'venues' | 'market'>('djs');
 
   const fetchDJs = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -201,6 +202,13 @@ export default function DJDirectoryScreen() {
         >
           <Ionicons name="business-outline" size={15} color={directoryTab === 'venues' ? C.accent : C.textSec} />
           <Text style={[d.toggleText, directoryTab === 'venues' && d.toggleTextActive]}>Venues</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[d.toggleBtn, directoryTab === 'market' && d.toggleBtnActive]}
+          onPress={() => setDirectoryTab('market')}
+        >
+          <Ionicons name="pricetag-outline" size={15} color={directoryTab === 'market' ? C.accent : C.textSec} />
+          <Text style={[d.toggleText, directoryTab === 'market' && d.toggleTextActive]}>Market</Text>
         </TouchableOpacity>
       </View>
 
@@ -276,6 +284,8 @@ export default function DJDirectoryScreen() {
       )}
 
       {directoryTab === 'venues' && <VenueDirectoryScreen />}
+
+      {directoryTab === 'market' && <MarketplaceScreen />}
 
       {/* DJ profile modal */}
       {selectedDJ && (

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Modal, FlatList, StatusBar, Alert, ActivityIndicator,
+  TextInput, Modal, FlatList, StatusBar, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,6 +74,12 @@ function GearChip({ gear, conn, onRemove, onChangeConn }: {
         )}
         {gear.category === 'laptop' && gear.os && (
           <Text style={s.chipMeta}>{gear.softwareCompatibility?.slice(0, 2).join(', ')}</Text>
+        )}
+        {gear.buyUrl && (
+          <TouchableOpacity onPress={() => Linking.openURL(gear.buyUrl!)} style={s.buyLink}>
+            <Ionicons name="cart-outline" size={11} color={C.success} />
+            <Text style={s.buyLinkText}>Buy new</Text>
+          </TouchableOpacity>
         )}
         {conn && (
           <TouchableOpacity onPress={() => setShowConn(true)} style={s.connBadge}>
@@ -240,6 +246,71 @@ function PowerMeter({ watts }: { watts: number }) {
   );
 }
 
+// ─── Rider Details Modal ─────────────────────────────────────────────────────
+// Defined outside HardwareLockerScreen to prevent re-render on keystroke
+interface RiderModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onGenerate: (gigName: string, date: string, venue: string) => void;
+  loading: boolean;
+}
+
+function RiderDetailsModal({ visible, onClose, onGenerate, loading }: RiderModalProps) {
+  const [gigName, setGigName] = useState('');
+  const [date, setDate]       = useState('');
+  const [venue, setVenue]     = useState('');
+
+  function handleGenerate() {
+    onGenerate(gigName, date, venue);
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.overlay}>
+        <View style={s.riderModal}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={s.sheetTitle}>Technical Rider</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={22} color={C.textSec} />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 12, color: C.textMuted, marginBottom: 16, lineHeight: 17 }}>
+            Optional details to include on the rider. Leave blank to generate without them.
+          </Text>
+          <Text style={s.riderFieldLabel}>Event / Gig name</Text>
+          <View style={s.riderFieldRow}>
+            <TextInput style={s.riderField} value={gigName} onChangeText={setGigName}
+              placeholder="e.g. Fabric Warm-up, Wedding, Festival" placeholderTextColor={C.textMuted} />
+          </View>
+          <Text style={s.riderFieldLabel}>Date</Text>
+          <View style={s.riderFieldRow}>
+            <TextInput style={s.riderField} value={date} onChangeText={setDate}
+              placeholder="e.g. 14 June 2025" placeholderTextColor={C.textMuted} />
+          </View>
+          <Text style={s.riderFieldLabel}>Venue</Text>
+          <View style={s.riderFieldRow}>
+            <TextInput style={s.riderField} value={venue} onChangeText={setVenue}
+              placeholder="e.g. Fabric, London" placeholderTextColor={C.textMuted} />
+          </View>
+          <TouchableOpacity
+            style={[s.riderBtn, { marginTop: 20 }]}
+            onPress={handleGenerate}
+            disabled={loading}
+          >
+            {loading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <>
+                  <Ionicons name="share-outline" size={16} color="#fff" />
+                  <Text style={s.riderBtnText}>Generate & Share PDF</Text>
+                </>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HardwareLockerScreen() {
   const store = useRigStore();
@@ -247,9 +318,7 @@ export default function HardwareLockerScreen() {
   const { profile, user } = useAuthStore();
   const [riderLoading, setRiderLoading] = useState(false);
   const [showRiderModal, setShowRiderModal] = useState(false);
-  const [riderGigName, setRiderGigName] = useState('');
-  const [riderDate, setRiderDate] = useState('');
-  const [riderVenue, setRiderVenue] = useState('');
+
 
   const [picker, setPicker] = useState<{
     visible: boolean; categories: GearCategory[]; title: string; onSelect: (g: GearItem) => void;
@@ -270,6 +339,37 @@ export default function HardwareLockerScreen() {
 
   const criticals = warnings.filter(w => w.severity === 'critical').length;
   const warningCount = warnings.filter(w => w.severity === 'warning').length;
+
+
+  async function generateRider(gigName: string, date: string, venue: string) {
+    setRiderLoading(true);
+    try {
+      const djName = profile?.dj_name || 'DJ';
+      const email  = profile?.email ?? user?.email;
+      if (mode === 'gig') {
+        const activeGig = store.gigProfiles.find(p => p.id === store.activeGigId);
+        if (!activeGig) { Alert.alert('No rig selected', 'Select a gig rig first.'); return; }
+        const data = buildRiderDataFromGig(
+          activeGig, djName, email, totalPowerDraw,
+          gigName || activeGig.name,
+          date || undefined,
+          venue || undefined,
+        );
+        await generateAndShareRider(data);
+      } else {
+        const data = buildRiderDataFromHome(
+          store.homeController, store.homeSpeakers, store.homeConnections,
+          store.homeLaptop, store.homeHeadphones, djName, email, totalPowerDraw,
+        );
+        await generateAndShareRider(data);
+      }
+      setShowRiderModal(false);
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not generate rider.');
+    } finally {
+      setRiderLoading(false);
+    }
+  }
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -444,50 +544,12 @@ export default function HardwareLockerScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Rider details modal */}
-      <Modal visible={showRiderModal} transparent animationType="fade">
-        <View style={s.overlay}>
-          <View style={s.riderModal}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={s.sheetTitle}>Technical Rider</Text>
-              <TouchableOpacity onPress={() => setShowRiderModal(false)}>
-                <Ionicons name="close" size={22} color={C.textSec} />
-              </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 12, color: C.textMuted, marginBottom: 16, lineHeight: 17 }}>
-              Optional details to include on the rider. Leave blank to generate without them.
-            </Text>
-            <Text style={s.riderFieldLabel}>Event / Gig name</Text>
-            <View style={s.riderFieldRow}>
-              <TextInput style={s.riderField} value={riderGigName} onChangeText={setRiderGigName}
-                placeholder="e.g. Fabric Warm-up, Wedding, Festival" placeholderTextColor={C.textMuted} />
-            </View>
-            <Text style={s.riderFieldLabel}>Date</Text>
-            <View style={s.riderFieldRow}>
-              <TextInput style={s.riderField} value={riderDate} onChangeText={setRiderDate}
-                placeholder="e.g. 14 June 2025" placeholderTextColor={C.textMuted} />
-            </View>
-            <Text style={s.riderFieldLabel}>Venue</Text>
-            <View style={s.riderFieldRow}>
-              <TextInput style={s.riderField} value={riderVenue} onChangeText={setRiderVenue}
-                placeholder="e.g. Fabric, London" placeholderTextColor={C.textMuted} />
-            </View>
-            <TouchableOpacity
-              style={[s.riderBtn, { marginTop: 20 }]}
-              onPress={generateRider}
-              disabled={riderLoading}
-            >
-              {riderLoading
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <>
-                    <Ionicons name="share-outline" size={16} color="#fff" />
-                    <Text style={s.riderBtnText}>Generate &amp; Share PDF</Text>
-                  </>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <RiderDetailsModal
+        visible={showRiderModal}
+        onClose={() => setShowRiderModal(false)}
+        onGenerate={generateRider}
+        loading={riderLoading}
+      />
 
       <GearPickerModal
         visible={picker.visible}
@@ -524,6 +586,8 @@ const s = StyleSheet.create({
   chipBrand: { fontSize: 10, color: C.textMuted, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.6 },
   chipModel: { fontSize: 15, fontWeight: '600', color: C.text, marginTop: 1 },
   chipMeta: { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  buyLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5, alignSelf: 'flex-start', backgroundColor: C.successBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
+  buyLinkText: { fontSize: 11, color: C.success, fontWeight: '600' },
   connBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, alignSelf: 'flex-start', backgroundColor: C.accentDim + '30', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
   connBadgeText: { fontSize: 11, color: C.accent, fontWeight: '500' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
