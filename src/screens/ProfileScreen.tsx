@@ -306,7 +306,14 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           <TouchableOpacity onPress={onClose} style={s.closeBtn}>
             <Ionicons name="close" size={22} color={C.textSec} />
           </TouchableOpacity>
-          <Text style={s.title}>Profile</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={s.title}>Profile</Text>
+            {profile?.is_admin && (
+              <View style={s.adminBadge}>
+                <Text style={s.adminBadgeText}>👑 Admin</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity onPress={saveProfile} disabled={saving} style={s.saveBtn}>
             {saving
               ? <ActivityIndicator size="small" color={C.accent} />
@@ -741,6 +748,8 @@ const s = StyleSheet.create({
   toggleThumbOn: { backgroundColor: '#7C5CFC', alignSelf: 'flex-end' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.criticalBg, borderRadius: 10, borderWidth: 1, borderColor: C.critical + '40' },
   dangerBtnText: { fontSize: 15, color: C.critical, fontWeight: '600' },
+  adminBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A1F00', borderWidth: 1, borderColor: '#F0C04060', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  adminBadgeText: { fontSize: 11, fontWeight: '700', color: '#F0C040' },
   myVenueCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.raised, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 4 },
   myVenueIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: C.accentDim + '40', alignItems: 'center', justifyContent: 'center' },
   myVenueName: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
