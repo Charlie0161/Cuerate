@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, Image, ActivityIndicator, ScrollView, Alert,
+  StatusBar, Image, ActivityIndicator, ScrollView, Alert, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/authStore';
 import PostBookingRequestModal from './PostBookingRequestModal';
 import VenueProfileModal from './VenueProfileModal';
 import { Venue } from './VenueDirectoryScreen';
+import AdminScreen from './AdminScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -21,7 +22,7 @@ const C = {
   success: '#4DCC8F', successBg: '#071A0F',
   warning: '#F5A623',
   text: '#F0EFF8', textSec: '#8A89A0', textMuted: '#52516A',
-  soundcloud: '#FF5500', soundcloudBg: '#1A0E00',
+  soundcloud: '#FF5500', soundcloudBg: '#1A0E00', gold: '#F0C040',
 };
 
 const GENRES = ['House', 'Techno', 'Drum & Bass', 'UK Garage', 'Jungle', 'Trance', 'Hip-Hop', 'Afrobeats', 'Disco', 'Ambient', 'Other'];
@@ -52,6 +53,7 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [enablingVenue, setEnablingVenue] = useState(false);
   const [myVenue, setMyVenue] = useState<Venue | null>(null);
   const [showMyVenue, setShowMyVenue] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
@@ -666,6 +668,15 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </View>
         )}
 
+        {/* Admin panel */}
+        {profile?.is_admin && (
+          <TouchableOpacity style={s.adminBtn} onPress={() => setShowAdmin(true)}>
+            <Text style={s.adminBtnEmoji}>👑</Text>
+            <Text style={s.adminBtnText}>Admin Panel</Text>
+            <Ionicons name="chevron-forward" size={16} color="#F0C040" />
+          </TouchableOpacity>
+        )}
+
         {/* Account */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Account</Text>
@@ -686,6 +697,12 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           onSuccess={() => { setShowPostGig(false); fetchVenueData(); }}
         />
       )}
+      {showAdmin && (
+        <Modal visible animationType="slide" presentationStyle="pageSheet">
+          <AdminScreen onClose={() => setShowAdmin(false)} />
+        </Modal>
+      )}
+
       {showMyVenue && myVenue && (
         <VenueProfileModal
           venue={myVenue}
@@ -748,6 +765,9 @@ const s = StyleSheet.create({
   toggleThumbOn: { backgroundColor: '#7C5CFC', alignSelf: 'flex-end' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.criticalBg, borderRadius: 10, borderWidth: 1, borderColor: C.critical + '40' },
   dangerBtnText: { fontSize: 15, color: C.critical, fontWeight: '600' },
+  adminBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1A1400', borderWidth: 1, borderColor: '#F0C04040', borderRadius: 14, padding: 16, marginBottom: 12 },
+  adminBtnEmoji: { fontSize: 20 },
+  adminBtnText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#F0C040' },
   adminBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A1F00', borderWidth: 1, borderColor: '#F0C04060', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   adminBadgeText: { fontSize: 11, fontWeight: '700', color: '#F0C040' },
   myVenueCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.raised, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 4 },

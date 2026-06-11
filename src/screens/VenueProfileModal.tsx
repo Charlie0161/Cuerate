@@ -11,6 +11,7 @@ import { Venue, StarRow, GearBadges } from './VenueDirectoryScreen';
 import AddVenueReviewModal from './AddVenueReviewModal';
 import ApplyForGigModal, { BookingRequest } from './ApplyForGigModal';
 import EditVenueModal from './EditVenueModal';
+import VenueClaimModal from './VenueClaimModal';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -65,21 +66,11 @@ export default function VenueProfileModal({ venue: initialVenue, onClose, onRevi
   const [gigSlots, setGigSlots]         = useState<BookingRequest[]>([]);
   const [appliedIds, setAppliedIds]     = useState<Set<string>>(new Set());
   const [applyTarget, setApplyTarget]   = useState<BookingRequest | null>(null);
-  const [claiming, setClaiming]         = useState(false);
+  const [showClaimModal, setShowClaimModal] = useState(false);
   const { user, profile } = useAuthStore();
   const isVenueAccount = profile?.is_venue === true;
   const isOwner = !!user && venue.owner_id === user.id;
   const canClaim = !!user && isVenueAccount && !venue.owner_id && !isOwner;
-
-  async function handleClaim() {
-    if (!user) return;
-    setClaiming(true);
-    const { error } = await supabase.from('venues').update({ owner_id: user.id }).eq('id', venue.id);
-    if (!error) {
-      setVenue(v => ({ ...v, owner_id: user.id }));
-    }
-    setClaiming(false);
-  }
 
   const initial = venue.name[0].toUpperCase();
 
@@ -142,9 +133,9 @@ export default function VenueProfileModal({ venue: initialVenue, onClose, onRevi
               </TouchableOpacity>
             )}
             {canClaim && (
-              <TouchableOpacity style={[p.reviewBtn, { borderColor: C.success + '60', backgroundColor: C.success + '10' }]} onPress={handleClaim} disabled={claiming}>
+              <TouchableOpacity style={[p.reviewBtn, { borderColor: C.success + '60', backgroundColor: C.success + '10' }]} onPress={() => setShowClaimModal(true)}>
                 <Ionicons name="flag-outline" size={14} color={C.success} />
-                <Text style={[p.reviewBtnText, { color: C.success }]}>{claiming ? 'Claiming…' : 'Claim venue'}</Text>
+                <Text style={[p.reviewBtnText, { color: C.success }]}>Claim venue</Text>
               </TouchableOpacity>
             )}
             {user && !userReview && !isOwner && (
@@ -381,6 +372,17 @@ export default function VenueProfileModal({ venue: initialVenue, onClose, onRevi
           </View>
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {showClaimModal && (
+          <VenueClaimModal
+            venue={venue}
+            onClose={() => setShowClaimModal(false)}
+            onSuccess={() => {
+              setShowClaimModal(false);
+              Alert.alert('Claim submitted', 'A Cuerate admin will review your request within 48 hours.');
+            }}
+          />
+        )}
 
         {showEditModal && (
           <EditVenueModal
