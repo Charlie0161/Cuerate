@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { DJProfile } from './DJDirectoryScreen';
+import MessagesScreen from './MessagesScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -68,6 +69,7 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
 
   const initials = dj.dj_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const isOwnProfile = user?.id === dj.id;
@@ -141,6 +143,18 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
     if (days < 30) return `${Math.floor(days / 7)}w ago`;
     return `${Math.floor(days / 30)}mo ago`;
   };
+
+  if (showMessages) {
+    return (
+      <Modal visible animationType="slide" presentationStyle="pageSheet">
+        <MessagesScreen
+          onClose={() => setShowMessages(false)}
+          openWithUserId={dj.id}
+          openWithUserName={dj.dj_name}
+        />
+      </Modal>
+    );
+  }
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -244,6 +258,15 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
                 >
                   <Ionicons name="mail-outline" size={15} color={C.success} />
                   <Text style={[p.actionBtnText, { color: C.success }]}>Book</Text>
+                </TouchableOpacity>
+              )}
+              {!isOwnProfile && user && (
+                <TouchableOpacity
+                  style={[p.actionBtn, { backgroundColor: C.accentDim + '20', borderColor: C.accentDim }]}
+                  onPress={() => setShowMessages(true)}
+                >
+                  <Ionicons name="chatbubble-outline" size={15} color={C.accent} />
+                  <Text style={[p.actionBtnText, { color: C.accent }]}>Message</Text>
                 </TouchableOpacity>
               )}
             </View>

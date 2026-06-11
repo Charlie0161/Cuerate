@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 import AvatarButton from '../../src/components/AvatarButton';
+import MessagesButton from '../../src/components/MessagesButton';
 
 const ACCENT = '#7C5CFC';
 const MUTED = '#52516A';
@@ -21,6 +22,8 @@ export default function TabLayout() {
         headerTitleStyle: { fontWeight: '700', fontSize: 17 },
         headerLeft: () => <AvatarButton />,
         headerLeftContainerStyle: { paddingLeft: 16 },
+        headerRight: () => <MessagesButton />,
+        headerRightContainerStyle: { paddingRight: 16 },
         tabBarStyle: {
           backgroundColor: SURFACE,
           borderTopColor: '#2A2A38',
