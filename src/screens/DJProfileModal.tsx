@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/authStore';
 import { DJProfile } from './DJDirectoryScreen';
 
 const C = {
@@ -59,12 +60,53 @@ interface DJProfileModalProps {
 }
 
 export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
+  const { user } = useAuthStore();
   const [mixes, setMixes]   = useState<Mix[]>([]);
   const [tracks, setTracks] = useState<TrackSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab]       = useState<'mixes' | 'tracks'>('mixes');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const initials = dj.dj_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const isOwnProfile = user?.id === dj.id;
+
+  useEffect(() => {
+    async function fetchFollowData() {
+      const { count } = await supabase
+        .from('follows')
+        .select('id', { count: 'exact', head: true })
+        .eq('following_id', dj.id);
+      setFollowerCount(count ?? 0);
+      if (user && !isOwnProfile) {
+        const { data } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('following_id', dj.id)
+          .maybeSingle();
+        setIsFollowing(!!data);
+      }
+    }
+    fetchFollowData();
+  }, [dj.id, user]);
+
+  async function toggleFollow() {
+    if (!user) return;
+    setFollowLoading(true);
+    if (isFollowing) {
+      await supabase.from('follows').delete()
+        .eq('follower_id', user.id).eq('following_id', dj.id);
+      setIsFollowing(false);
+      setFollowerCount(c => Math.max(0, c - 1));
+    } else {
+      await supabase.from('follows').insert({ follower_id: user.id, following_id: dj.id });
+      setIsFollowing(true);
+      setFollowerCount(c => c + 1);
+    }
+    setFollowLoading(false);
+  }
 
   useEffect(() => {
     async function fetchData() {
@@ -154,10 +196,38 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
                 <Text style={p.statVal}>{dj.track_count}</Text>
                 <Text style={p.statLabel}>Tracks</Text>
               </View>
+              <View style={p.statDivider} />
+              <View style={p.statItem}>
+                <Text style={p.statVal}>{followerCount}</Text>
+                <Text style={p.statLabel}>Followers</Text>
+              </View>
             </View>
 
             {/* Action buttons */}
             <View style={p.actions}>
+              {!isOwnProfile && user && (
+                <TouchableOpacity
+                  style={[p.actionBtn, isFollowing
+                    ? { backgroundColor: C.accentDim + '30', borderColor: C.accent }
+                    : { backgroundColor: C.accent, borderColor: C.accent }]}
+                  onPress={toggleFollow}
+                  disabled={followLoading}
+                >
+                  {followLoading
+                    ? <ActivityIndicator size="small" color={isFollowing ? C.accent : '#fff'} />
+                    : <>
+                        <Ionicons
+                          name={isFollowing ? 'checkmark' : 'person-add-outline'}
+                          size={15}
+                          color={isFollowing ? C.accent : '#fff'}
+                        />
+                        <Text style={[p.actionBtnText, { color: isFollowing ? C.accent : '#fff' }]}>
+                          {isFollowing ? 'Following' : 'Follow'}
+                        </Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              )}
               {dj.soundcloud_url && (
                 <TouchableOpacity
                   style={[p.actionBtn, { backgroundColor: '#1A0E00', borderColor: C.soundcloud + '50' }]}

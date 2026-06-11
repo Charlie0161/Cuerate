@@ -48,6 +48,19 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [showPostGig, setShowPostGig] = useState(false);
   const [appsLoading, setAppsLoading] = useState(false);
   const [enablingVenue, setEnablingVenue] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', user.id),
+      supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', user.id),
+    ]).then(([followers, following]) => {
+      setFollowerCount(followers.count ?? 0);
+      setFollowingCount(following.count ?? 0);
+    });
+  }, [user]);
 
   useEffect(() => {
     if (profile?.is_venue && user) fetchVenueData();
@@ -293,6 +306,19 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
                   {saved ? 'Saved!' : 'Save'}
                 </Text>}
           </TouchableOpacity>
+        </View>
+
+        {/* Follower stats */}
+        <View style={s.followStatsRow}>
+          <View style={s.followStat}>
+            <Text style={s.followStatVal}>{followerCount}</Text>
+            <Text style={s.followStatLabel}>Followers</Text>
+          </View>
+          <View style={s.followStatDivider} />
+          <View style={s.followStat}>
+            <Text style={s.followStatVal}>{followingCount}</Text>
+            <Text style={s.followStatLabel}>Following</Text>
+          </View>
         </View>
 
         {/* Role tab switcher */}
@@ -694,6 +720,11 @@ const s = StyleSheet.create({
   appStatusAccepted: { backgroundColor: C.success + '15', borderColor: C.success + '50' },
   appStatusDeclined: { backgroundColor: C.criticalBg, borderColor: C.critical + '40' },
   appStatusText: { fontSize: 12, fontWeight: '600' },
+  followStatsRow: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, marginBottom: 16, overflow: 'hidden' },
+  followStat: { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  followStatVal: { fontSize: 20, fontWeight: '700', color: C.text },
+  followStatLabel: { fontSize: 11, color: C.textMuted, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+  followStatDivider: { width: 1, backgroundColor: C.border },
   tabRow: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 4, marginBottom: 20, gap: 4 },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
   tabActive: { backgroundColor: C.accentDim + '50', borderWidth: 1, borderColor: C.accentDim },
