@@ -103,6 +103,10 @@ export default function FestivalSetsScreen() {
     return Array.from(map.entries()).map(([, sets]) => ({ dj: sets[0].dj_name, sets }));
   }
 
+  function searchQuery(set: FestivalSet) {
+    return `https://www.google.com/search?q=${encodeURIComponent(`${set.dj_name} ${set.event_name} ${set.event_date?.slice(0, 4) ?? ''} DJ set tracklist`)}`;
+  }
+
   function renderSet(set: FestivalSet) {
     const isExpanded = expanded === set.id;
     return (
@@ -144,22 +148,17 @@ export default function FestivalSetsScreen() {
 
         {isExpanded && (
           <View style={s.setDetail}>
-            {set.tracklist_url && (
-              <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(set.tracklist_url!)}>
-                <Ionicons name="list-outline" size={14} color={C.accent} />
-                <Text style={s.linkBtnText}>View tracklist on 1001Tracklists</Text>
-                <Ionicons name="open-outline" size={12} color={C.textMuted} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(searchQuery(set))}>
+              <Ionicons name="list-outline" size={14} color={C.accent} />
+              <Text style={s.linkBtnText}>Search tracklist &amp; recordings</Text>
+              <Ionicons name="open-outline" size={12} color={C.textMuted} />
+            </TouchableOpacity>
             {set.mix_url && (
               <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(set.mix_url!)}>
                 <Ionicons name="play-circle-outline" size={14} color={C.success} />
                 <Text style={[s.linkBtnText, { color: C.success }]}>Listen to recording</Text>
                 <Ionicons name="open-outline" size={12} color={C.textMuted} />
               </TouchableOpacity>
-            )}
-            {!set.tracklist_url && !set.mix_url && (
-              <Text style={{ fontSize: 12, color: C.textMuted }}>No recording or tracklist linked.</Text>
             )}
           </View>
         )}
@@ -218,22 +217,17 @@ export default function FestivalSetsScreen() {
 
         {isExpanded && (
           <View style={s.setDetail}>
-            {item.tracklist_url && (
-              <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(item.tracklist_url!)}>
-                <Ionicons name="list-outline" size={14} color={C.accent} />
-                <Text style={s.linkBtnText}>View tracklist on 1001Tracklists</Text>
-                <Ionicons name="open-outline" size={12} color={C.textMuted} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(searchQuery(item))}>
+              <Ionicons name="list-outline" size={14} color={C.accent} />
+              <Text style={s.linkBtnText}>Search tracklist &amp; recordings</Text>
+              <Ionicons name="open-outline" size={12} color={C.textMuted} />
+            </TouchableOpacity>
             {item.mix_url && (
               <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(item.mix_url!)}>
                 <Ionicons name="play-circle-outline" size={14} color={C.success} />
                 <Text style={[s.linkBtnText, { color: C.success }]}>Listen to recording</Text>
                 <Ionicons name="open-outline" size={12} color={C.textMuted} />
               </TouchableOpacity>
-            )}
-            {!item.tracklist_url && !item.mix_url && (
-              <Text style={{ fontSize: 12, color: C.textMuted }}>No recording or tracklist linked.</Text>
             )}
           </View>
         )}
