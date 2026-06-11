@@ -34,6 +34,12 @@ export type Profile = {
   soundcloud_username: string | null;
   soundcloud_avatar: string | null;
   bio: string | null;
+  genre: string | null;
+  location: string | null;
+  booking_email: string | null;
+  is_public: boolean | null;
+  is_pro: boolean | null;
+  account_type: 'dj' | 'venue' | null;
   created_at: string;
   updated_at: string;
 };

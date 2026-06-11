@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   StatusBar, Image, ActivityIndicator, ScrollView, Alert,
@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as AuthSession from 'expo-auth-session';
 import { supabase, SOUNDCLOUD_CLIENT_ID, SOUNDCLOUD_REDIRECT_URI } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import PostBookingRequestModal from './PostBookingRequestModal';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -38,6 +39,65 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [location, setLocation] = useState(profile?.location ?? '');
   const [bookingEmail, setBookingEmail] = useState(profile?.booking_email ?? '');
   const [isPublic, setIsPublic] = useState(profile?.is_public ?? false);
+
+  // Venue-only state
+  const isVenue = profile?.account_type === 'venue';
+  const [gigSlots, setGigSlots] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
+  const [showPostGig, setShowPostGig] = useState(false);
+  const [appsLoading, setAppsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isVenue && user) fetchVenueData();
+  }, [isVenue, user]);
+
+  async function fetchVenueData() {
+    if (!user) return;
+    setAppsLoading(true);
+    const { data: slots } = await supabase
+      .from('booking_requests')
+      .select('*')
+      .eq('venue_id', user.id)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
+    setGigSlots(slots ?? []);
+    if (slots && slots.length > 0) {
+      const ids = slots.map((s: any) => s.id);
+      const { data: apps } = await supabase
+        .from('booking_applications')
+        .select('*, profiles:dj_id(dj_name, booking_email, avatar_url)')
+        .in('request_id', ids)
+        .order('created_at', { ascending: false });
+      setApplications(apps ?? []);
+    }
+    setAppsLoading(false);
+  }
+
+  async function handleAccept(appId: string, djName: string, djEmail: string | null) {
+    await supabase.from('booking_applications').update({ status: 'accepted' }).eq('id', appId);
+    setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'accepted' } : a));
+    Alert.alert(
+      `Accepted — ${djName}`,
+      djEmail
+        ? `Contact them at:\n${djEmail}`
+        : 'This DJ has not set a booking email. Try reaching them through the DJ Directory.',
+      [{ text: 'OK' }]
+    );
+  }
+
+  async function handleDecline(appId: string) {
+    await supabase.from('booking_applications').update({ status: 'declined' }).eq('id', appId);
+    setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'declined' } : a));
+  }
+
+  function formatFee(min: number | null, max: number | null) {
+    if (!min && !max) return 'Fee TBC';
+    const fmt = (p: number) => `£${(p / 100).toFixed(0)}`;
+    if (min && max) return `${fmt(min)}–${fmt(max)}`;
+    if (min) return `From ${fmt(min)}`;
+    return `Up to ${fmt(max!)}`;
+  }
 
   async function saveProfile() {
     setSaving(true);
@@ -381,6 +441,92 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </Text>
         </View>
 
+        {/* Venue: Gig Slots */}
+        {isVenue && (
+          <View style={s.card}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={s.cardTitle}>Gig Slots</Text>
+              <TouchableOpacity style={s.postGigBtn} onPress={() => setShowPostGig(true)}>
+                <Ionicons name="add" size={14} color={C.accent} />
+                <Text style={s.postGigBtnText}>Post slot</Text>
+              </TouchableOpacity>
+            </View>
+
+            {appsLoading ? (
+              <ActivityIndicator size="small" color={C.accent} />
+            ) : gigSlots.length === 0 ? (
+              <Text style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', paddingVertical: 12 }}>
+                No open gig slots. Post one to receive DJ applications.
+              </Text>
+            ) : gigSlots.map(slot => {
+              const slotApps = applications.filter(a => a.request_id === slot.id);
+              const pendingCount = slotApps.filter(a => a.status === 'pending').length;
+              const isExpanded = expandedSlot === slot.id;
+              return (
+                <View key={slot.id} style={s.slotCard}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                    onPress={() => setExpandedSlot(isExpanded ? null : slot.id)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.slotDate}>{slot.date}</Text>
+                      <Text style={s.slotMeta}>
+                        {slot.genre ?? 'Any genre'} · {formatFee(slot.fee_min, slot.fee_max)}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      {pendingCount > 0 && (
+                        <View style={s.appBadge}>
+                          <Text style={s.appBadgeText}>{pendingCount} new</Text>
+                        </View>
+                      )}
+                      <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={14} color={C.textMuted}
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {isExpanded && (
+                    <View style={{ marginTop: 12, gap: 10, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 12 }}>
+                      {slotApps.length === 0 ? (
+                        <Text style={{ fontSize: 12, color: C.textMuted }}>No applications yet.</Text>
+                      ) : slotApps.map(app => (
+                        <View key={app.id} style={s.appCard}>
+                          <Text style={s.appDjName}>{app.profiles?.dj_name ?? 'Unknown DJ'}</Text>
+                          {app.message ? <Text style={s.appMessage}>{app.message}</Text> : null}
+                          {app.status === 'pending' ? (
+                            <View style={s.appActions}>
+                              <TouchableOpacity
+                                style={s.acceptBtn}
+                                onPress={() => handleAccept(app.id, app.profiles?.dj_name ?? 'DJ', app.profiles?.booking_email)}
+                              >
+                                <Text style={s.acceptBtnText}>Accept</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={s.declineBtn}
+                                onPress={() => handleDecline(app.id)}
+                              >
+                                <Text style={s.declineBtnText}>Decline</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <View style={[s.appStatusPill, app.status === 'accepted' ? s.appStatusAccepted : s.appStatusDeclined]}>
+                              <Text style={[s.appStatusText, { color: app.status === 'accepted' ? C.success : C.critical }]}>
+                                {app.status === 'accepted' ? '✓ Accepted' : '✕ Declined'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Account */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Account</Text>
@@ -392,6 +538,15 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {showPostGig && profile && (
+        <PostBookingRequestModal
+          venueName={profile.dj_name ?? 'Venue'}
+          venueId={user!.id}
+          onClose={() => setShowPostGig(false)}
+          onSuccess={() => { setShowPostGig(false); fetchVenueData(); }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -444,4 +599,23 @@ const s = StyleSheet.create({
   toggleThumbOn: { backgroundColor: '#7C5CFC', alignSelf: 'flex-end' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.criticalBg, borderRadius: 10, borderWidth: 1, borderColor: C.critical + '40' },
   dangerBtnText: { fontSize: 15, color: C.critical, fontWeight: '600' },
+  postGigBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: C.accentDim + '40', borderWidth: 1, borderColor: C.accentDim },
+  postGigBtnText: { fontSize: 12, fontWeight: '600', color: C.accent },
+  slotCard: { backgroundColor: C.raised, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 10 },
+  slotDate: { fontSize: 14, fontWeight: '700', color: C.text },
+  slotMeta: { fontSize: 12, color: C.textMuted, marginTop: 2 },
+  appBadge: { backgroundColor: C.accentDim + '40', borderWidth: 1, borderColor: C.accentDim, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  appBadgeText: { fontSize: 11, fontWeight: '600', color: C.accent },
+  appCard: { backgroundColor: C.bg, borderRadius: 8, borderWidth: 1, borderColor: C.border, padding: 12, gap: 6 },
+  appDjName: { fontSize: 14, fontWeight: '700', color: C.text },
+  appMessage: { fontSize: 13, color: C.textSec, lineHeight: 18 },
+  appActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  acceptBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, backgroundColor: C.success + '20', borderWidth: 1, borderColor: C.success + '60' },
+  acceptBtnText: { fontSize: 13, fontWeight: '600', color: C.success },
+  declineBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, backgroundColor: C.criticalBg, borderWidth: 1, borderColor: C.critical + '40' },
+  declineBtnText: { fontSize: 13, fontWeight: '600', color: C.critical },
+  appStatusPill: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, marginTop: 4 },
+  appStatusAccepted: { backgroundColor: C.success + '15', borderColor: C.success + '50' },
+  appStatusDeclined: { backgroundColor: C.criticalBg, borderColor: C.critical + '40' },
+  appStatusText: { fontSize: 12, fontWeight: '600' },
 });

@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { Venue, StarRow, GearBadges } from './VenueDirectoryScreen';
 import AddVenueReviewModal from './AddVenueReviewModal';
+import ApplyForGigModal, { BookingRequest } from './ApplyForGigModal';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -54,15 +55,39 @@ interface VenueProfileModalProps {
 }
 
 export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }: VenueProfileModalProps) {
-  const [reviews, setReviews]         = useState<Review[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [reviews, setReviews]           = useState<Review[]>([]);
+  const [loading, setLoading]           = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [userReview, setUserReview]   = useState<Review | null>(null);
-  const { user } = useAuthStore();
+  const [userReview, setUserReview]     = useState<Review | null>(null);
+  const [gigSlots, setGigSlots]         = useState<BookingRequest[]>([]);
+  const [appliedIds, setAppliedIds]     = useState<Set<string>>(new Set());
+  const [applyTarget, setApplyTarget]   = useState<BookingRequest | null>(null);
+  const { user, profile } = useAuthStore();
+  const isVenueAccount = (profile as any)?.account_type === 'venue';
 
   const initial = venue.name[0].toUpperCase();
 
-  useEffect(() => { fetchReviews(); }, [venue.id]);
+  useEffect(() => { fetchReviews(); fetchGigSlots(); }, [venue.id]);
+
+  async function fetchGigSlots() {
+    const { data } = await supabase
+      .from('booking_requests')
+      .select('*')
+      .eq('venue_id', venue.id)
+      .eq('status', 'open')
+      .order('date', { ascending: true });
+    setGigSlots((data ?? []) as BookingRequest[]);
+
+    if (user && data && data.length > 0) {
+      const ids = data.map((r: any) => r.id);
+      const { data: apps } = await supabase
+        .from('booking_applications')
+        .select('request_id')
+        .eq('dj_id', user.id)
+        .in('request_id', ids);
+      setAppliedIds(new Set((apps ?? []).map((a: any) => a.request_id)));
+    }
+  }
 
   async function fetchReviews() {
     setLoading(true);
@@ -205,6 +230,52 @@ export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }:
               </View>
             ) : null}
 
+            {/* Open gig slots */}
+            {gigSlots.length > 0 && (
+              <View style={p.card}>
+                <Text style={p.cardTitle}>Open gig slots</Text>
+                {gigSlots.map(slot => {
+                  const applied = appliedIds.has(slot.id);
+                  const feeStr = slot.fee_min || slot.fee_max
+                    ? `£${slot.fee_min ? (slot.fee_min / 100).toLocaleString('en-GB') : '?'} – £${slot.fee_max ? (slot.fee_max / 100).toLocaleString('en-GB') : '?'}`
+                    : null;
+                  return (
+                    <View key={slot.id} style={p.gigSlot}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={p.gigDate}>{slot.date}</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                          {slot.genre && (
+                            <View style={p.gigBadge}>
+                              <Text style={p.gigBadgeText}>{slot.genre}</Text>
+                            </View>
+                          )}
+                          {feeStr && (
+                            <View style={[p.gigBadge, { borderColor: C.success + '44', backgroundColor: C.success + '12' }]}>
+                              <Text style={[p.gigBadgeText, { color: C.success }]}>{feeStr}</Text>
+                            </View>
+                          )}
+                        </View>
+                        {slot.description ? (
+                          <Text style={p.gigDesc} numberOfLines={2}>{slot.description}</Text>
+                        ) : null}
+                      </View>
+                      {!isVenueAccount && user && (
+                        <TouchableOpacity
+                          style={[p.applyBtn, applied && p.applyBtnDone]}
+                          onPress={() => !applied && setApplyTarget(slot)}
+                          disabled={applied}
+                        >
+                          <Text style={[p.applyBtnText, applied && { color: C.success }]}>
+                            {applied ? '✓ Applied' : 'Apply'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             {/* Reviews */}
             <View style={p.card}>
               <Text style={p.cardTitle}>DJ Reviews</Text>
@@ -286,6 +357,17 @@ export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }:
             }}
           />
         )}
+
+        {applyTarget && (
+          <ApplyForGigModal
+            request={applyTarget}
+            onClose={() => setApplyTarget(null)}
+            onSuccess={() => {
+              setApplyTarget(null);
+              setAppliedIds(prev => new Set([...prev, applyTarget.id]));
+            }}
+          />
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -325,4 +407,12 @@ const p = StyleSheet.create({
   ratingChip: { borderRadius: 5, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
   ratingChipText: { fontSize: 10, fontWeight: '700' },
   reviewText: { fontSize: 13, color: C.textSec, lineHeight: 18, marginTop: 8 },
+  gigSlot: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  gigDate: { fontSize: 14, fontWeight: '700', color: C.text },
+  gigBadge: { borderRadius: 6, borderWidth: 1, borderColor: C.accentDim, backgroundColor: C.accentDim + '20', paddingHorizontal: 8, paddingVertical: 3 },
+  gigBadgeText: { fontSize: 11, fontWeight: '600', color: C.accent },
+  gigDesc: { fontSize: 12, color: C.textMuted, lineHeight: 17, marginTop: 2 },
+  applyBtn: { backgroundColor: C.accent, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  applyBtnDone: { backgroundColor: C.success + '18', borderWidth: 1, borderColor: C.success + '44' },
+  applyBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 });
