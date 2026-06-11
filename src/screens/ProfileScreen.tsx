@@ -39,18 +39,19 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [location, setLocation] = useState(profile?.location ?? '');
   const [bookingEmail, setBookingEmail] = useState(profile?.booking_email ?? '');
   const [isPublic, setIsPublic] = useState(profile?.is_public ?? false);
+  const [activeTab, setActiveTab] = useState<'dj' | 'venue'>('dj');
 
-  // Venue-only state
-  const isVenue = profile?.account_type === 'venue';
+  // Venue state
   const [gigSlots, setGigSlots] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [showPostGig, setShowPostGig] = useState(false);
   const [appsLoading, setAppsLoading] = useState(false);
+  const [enablingVenue, setEnablingVenue] = useState(false);
 
   useEffect(() => {
-    if (isVenue && user) fetchVenueData();
-  }, [isVenue, user]);
+    if (profile?.is_venue && user) fetchVenueData();
+  }, [profile?.is_venue, user]);
 
   async function fetchVenueData() {
     if (!user) return;
@@ -97,6 +98,13 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
     if (min && max) return `${fmt(min)}–${fmt(max)}`;
     if (min) return `From ${fmt(min)}`;
     return `Up to ${fmt(max!)}`;
+  }
+
+  async function enableVenueAccount() {
+    setEnablingVenue(true);
+    await updateProfile({ is_venue: true });
+    setEnablingVenue(false);
+    fetchVenueData();
   }
 
   async function saveProfile() {
@@ -267,8 +275,29 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </TouchableOpacity>
         </View>
 
+        {/* Role tab switcher */}
+        <View style={s.tabRow}>
+          <TouchableOpacity
+            style={[s.tab, activeTab === 'dj' && s.tabActive]}
+            onPress={() => setActiveTab('dj')}
+          >
+            <Ionicons name="musical-notes-outline" size={14} color={activeTab === 'dj' ? C.accent : C.textMuted} />
+            <Text style={[s.tabText, activeTab === 'dj' && s.tabTextActive]}>DJ Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.tab, activeTab === 'venue' && s.tabActive]}
+            onPress={() => setActiveTab('venue')}
+          >
+            <Ionicons name="business-outline" size={14} color={activeTab === 'venue' ? C.accent : C.textMuted} />
+            <Text style={[s.tabText, activeTab === 'venue' && s.tabTextActive]}>Venue</Text>
+            {profile?.is_venue && applications.filter(a => a.status === 'pending').length > 0 && (
+              <View style={s.tabDot} />
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Avatar */}
-        <View style={s.avatarSection}>
+        <View style={[s.avatarSection, activeTab === 'venue' && { display: 'none' }]}>
           <TouchableOpacity onPress={pickAvatar} style={s.avatarWrap}>
             {avatarLoading ? (
               <ActivityIndicator size="large" color={C.accent} />
@@ -285,6 +314,9 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </TouchableOpacity>
           <Text style={s.avatarHint}>Tap to change photo</Text>
         </View>
+
+        {/* ── DJ TAB ── */}
+        {activeTab === 'dj' && <>
 
         {/* DJ Info */}
         <View style={s.card}>
@@ -441,8 +473,32 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </Text>
         </View>
 
-        {/* Venue: Gig Slots */}
-        {isVenue && (
+        {/* End DJ tab */}
+        </>}
+
+        {/* ── VENUE TAB ── */}
+        {activeTab === 'venue' && !profile?.is_venue && (
+          <View style={s.card}>
+            <View style={s.venueEnableBox}>
+              <Ionicons name="business-outline" size={32} color={C.accent} />
+              <Text style={s.venueEnableTitle}>Enable venue account</Text>
+              <Text style={s.venueEnableDesc}>
+                Post open gig slots and receive DJ applications — without losing your DJ profile.
+              </Text>
+              <TouchableOpacity
+                style={[s.venueEnableBtn, enablingVenue && { opacity: 0.6 }]}
+                onPress={enableVenueAccount}
+                disabled={enablingVenue}
+              >
+                {enablingVenue
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.venueEnableBtnText}>Enable venue features</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {activeTab === 'venue' && profile?.is_venue && (
           <View style={s.card}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={s.cardTitle}>Gig Slots</Text>
@@ -618,4 +674,15 @@ const s = StyleSheet.create({
   appStatusAccepted: { backgroundColor: C.success + '15', borderColor: C.success + '50' },
   appStatusDeclined: { backgroundColor: C.criticalBg, borderColor: C.critical + '40' },
   appStatusText: { fontSize: 12, fontWeight: '600' },
+  tabRow: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 4, marginBottom: 20, gap: 4 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
+  tabActive: { backgroundColor: C.accentDim + '50', borderWidth: 1, borderColor: C.accentDim },
+  tabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  tabTextActive: { color: C.accent },
+  tabDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent },
+  venueEnableBox: { alignItems: 'center', gap: 12, paddingVertical: 16 },
+  venueEnableTitle: { fontSize: 17, fontWeight: '700', color: C.text },
+  venueEnableDesc: { fontSize: 13, color: C.textSec, textAlign: 'center', lineHeight: 19 },
+  venueEnableBtn: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 28, marginTop: 4 },
+  venueEnableBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
