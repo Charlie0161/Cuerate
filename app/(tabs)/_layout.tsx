@@ -53,6 +53,10 @@ export default function TabLayout() {
         title: 'Directory',
         tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
       }} />
+      <Tabs.Screen name="gigs" options={{
+        title: 'Gigs',
+        tabBarIcon: ({ color, size }) => <Ionicons name="megaphone-outline" color={color} size={size} />,
+      }} />
       <Tabs.Screen name="gig-calc" options={{
         title: 'Gig Calc',
         tabBarIcon: ({ color, size }) => <Ionicons name="calculator-outline" color={color} size={size} />,
