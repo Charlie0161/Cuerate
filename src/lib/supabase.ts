@@ -6,7 +6,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 export const GOOGLE_CLIENT_ID = '535231617763-87c5epeo4nkv2iufka2g20qbhpet0jmk.apps.googleusercontent.com';
 export const SOUNDCLOUD_CLIENT_ID = 'W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M';
-export const SOUNDCLOUD_CLIENT_SECRET = 'ZOSo39MuYXZ5jZXaCtXQECNVNuniDFGx';
 export const SOUNDCLOUD_REDIRECT_URI = 'cuerate://soundcloud-callback';
 
 // Secure storage adapter for Supabase sessions
@@ -37,6 +36,7 @@ export type Profile = {
   genre: string | null;
   location: string | null;
   booking_email: string | null;
+  preview_track_url: string | null;
   is_public: boolean | null;
   is_pro: boolean | null;
   is_venue: boolean | null;

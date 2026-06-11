@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/authStore';
 import SubmitSetModal from './SubmitSetModal';
 
 const C = {
@@ -34,6 +35,7 @@ function formatDate(d: string | null) {
 }
 
 export default function FestivalSetsScreen() {
+  const { initialized } = useAuthStore();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FestivalSet[]>([]);
   const [recent, setRecent] = useState<FestivalSet[]>([]);
@@ -67,8 +69,8 @@ export default function FestivalSetsScreen() {
   }, []);
 
   useEffect(() => {
-    loadRecent().finally(() => setLoading(false));
-  }, [loadRecent]);
+    if (initialized) loadRecent().finally(() => setLoading(false));
+  }, [initialized, loadRecent]);
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
@@ -290,6 +292,10 @@ export default function FestivalSetsScreen() {
             keyExtractor={i => i.dj}
             renderItem={renderDJGroup}
             contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+            removeClippedSubviews
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            initialNumToRender={8}
           />
         )
       ) : (
@@ -299,6 +305,10 @@ export default function FestivalSetsScreen() {
           renderItem={renderRecentSet}
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+          removeClippedSubviews
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
           ListHeaderComponent={
             <Text style={s.sectionLabel}>Most popular</Text>
           }

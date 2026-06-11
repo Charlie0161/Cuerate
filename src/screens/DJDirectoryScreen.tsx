@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/authStore';
 import DJProfileModal from './DJProfileModal';
 import VenueDirectoryScreen from './VenueDirectoryScreen';
 import MarketplaceScreen from './MarketplaceScreen';
@@ -37,6 +38,7 @@ export interface DJProfile {
   genre: string | null;
   location: string | null;
   booking_email: string | null;
+  preview_track_url: string | null;
   mix_count: number;
   track_count: number;
   created_at: string;
@@ -130,6 +132,7 @@ function SkeletonCard() {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function DJDirectoryScreen() {
+  const { initialized } = useAuthStore();
   const [djs, setDjs]             = useState<DJProfile[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -163,7 +166,7 @@ export default function DJDirectoryScreen() {
     setRefreshing(false);
   }, [search, genre]);
 
-  useEffect(() => { fetchDJs(); }, [fetchDJs]);
+  useEffect(() => { if (initialized) fetchDJs(); }, [initialized, fetchDJs]);
 
   // Debounced search
   useEffect(() => {
@@ -277,6 +280,10 @@ export default function DJDirectoryScreen() {
           onRefresh={() => fetchDJs(true)}
           refreshing={refreshing}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={12}
         />
       )}
 

@@ -20,6 +20,8 @@ export interface BookingRequest {
   venue_id: string;
   venue_name: string;
   date: string;
+  start_time: string | null;
+  location: string | null;
   genre: string | null;
   fee_min: number | null;
   fee_max: number | null;

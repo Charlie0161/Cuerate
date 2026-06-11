@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, TextInput, RefreshControl,
-  Linking, FlatList,
+  Linking, FlatList, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { MixCardSkeleton, DJCardSkeleton } from '../components/SkeletonCard';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -208,9 +210,11 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
     if (liked) {
       await supabase.from('likes').delete().eq('mix_id', mix.id).eq('user_id', session.user.id);
       setLikeCount(c => c - 1);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
       await supabase.from('likes').insert({ mix_id: mix.id, user_id: session.user.id });
       setLikeCount(c => c + 1);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setLiked(!liked);
   }
@@ -346,9 +350,158 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
   );
 }
 
+// ─── Suggested DJs ───────────────────────────────────────────────────────────
+type DJSuggestion = {
+  id: string;
+  dj_name: string | null;
+  genre: string | null;
+  location: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  soundcloud_avatar: string | null;
+};
+
+const GENRE_FILTERS = ['All', 'House', 'Techno', 'Drum & Bass', 'UK Garage', 'Jungle', 'Trance', 'Hip-Hop', 'Afrobeats', 'Disco', 'Ambient'];
+
+function SuggestedDJs({ currentUserId, onFollowed }: { currentUserId: string; onFollowed: () => void }) {
+  const [djs, setDjs] = useState<DJSuggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [genreFilter, setGenreFilter] = useState('All');
+  const [areaSearch, setAreaSearch] = useState('');
+  const [following, setFollowing] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    let q = supabase
+      .from('profiles')
+      .select('id, dj_name, genre, location, bio, avatar_url, soundcloud_avatar')
+      .neq('id', currentUserId)
+      .eq('is_public', true)
+      .not('dj_name', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (genreFilter !== 'All') q = q.ilike('genre', `%${genreFilter}%`);
+    if (areaSearch.trim()) q = q.ilike('location', `%${areaSearch.trim()}%`);
+
+    const { data } = await q;
+    setDjs(data ?? []);
+    setLoading(false);
+  }, [genreFilter, areaSearch, currentUserId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleFollow(djId: string) {
+    if (following.has(djId)) return;
+    setFollowing(prev => new Set(prev).add(djId));
+    await supabase.from('follows').insert({ follower_id: currentUserId, following_id: djId });
+    onFollowed();
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={sg.headerRow}>
+        <Ionicons name="people-outline" size={20} color={C.accent} />
+        <Text style={sg.heading}>Suggested DJs to follow</Text>
+      </View>
+
+      {/* Area search */}
+      <View style={sg.searchBar}>
+        <Ionicons name="location-outline" size={14} color={C.textMuted} />
+        <TextInput
+          style={sg.searchInput}
+          placeholder="Filter by city or area..."
+          placeholderTextColor={C.textMuted}
+          value={areaSearch}
+          onChangeText={setAreaSearch}
+        />
+        {areaSearch !== '' && (
+          <TouchableOpacity onPress={() => setAreaSearch('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={15} color={C.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Genre chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 10 }}>
+        {GENRE_FILTERS.map(g => (
+          <TouchableOpacity
+            key={g}
+            style={[sg.genrePill, genreFilter === g && sg.genrePillActive]}
+            onPress={() => setGenreFilter(g)}
+          >
+            <Text style={[sg.genrePillText, genreFilter === g && { color: C.accent }]}>{g}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {loading ? (
+        <FlatList data={[1,2,3,4,5]} keyExtractor={i => String(i)} scrollEnabled={false} contentContainerStyle={{ padding: 16, gap: 10 }} renderItem={() => <DJCardSkeleton />} />
+      ) : djs.length === 0 ? (
+        <View style={sg.empty}>
+          <Ionicons name="search-outline" size={40} color={C.textMuted} />
+          <Text style={sg.emptyText}>No DJs found{genreFilter !== 'All' ? ` for ${genreFilter}` : ''}{areaSearch ? ` in "${areaSearch}"` : ''}</Text>
+          <TouchableOpacity onPress={() => { setGenreFilter('All'); setAreaSearch(''); }}>
+            <Text style={sg.clearText}>Clear filters</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={djs}
+          keyExtractor={d => d.id}
+          contentContainerStyle={{ padding: 16, gap: 10 }}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const avatarUri = item.avatar_url ?? item.soundcloud_avatar;
+            const initials = (item.dj_name ?? 'D')[0].toUpperCase();
+            const followed = following.has(item.id);
+            return (
+              <View style={sg.card}>
+                <View style={sg.avatarWrap}>
+                  {avatarUri
+                    ? <Image source={{ uri: avatarUri }} style={sg.avatar} />
+                    : <View style={sg.avatarPlaceholder}><Text style={sg.avatarInitials}>{initials}</Text></View>
+                  }
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={sg.name}>{item.dj_name}</Text>
+                  <View style={sg.metaRow}>
+                    {item.genre && (
+                      <View style={sg.metaChip}>
+                        <Ionicons name="musical-note-outline" size={11} color={C.accent} />
+                        <Text style={sg.metaChipText}>{item.genre}</Text>
+                      </View>
+                    )}
+                    {item.location && (
+                      <View style={sg.metaChip}>
+                        <Ionicons name="location-outline" size={11} color={C.textMuted} />
+                        <Text style={[sg.metaChipText, { color: C.textMuted }]}>{item.location}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {item.bio && <Text style={sg.bio} numberOfLines={1}>{item.bio}</Text>}
+                </View>
+                <TouchableOpacity
+                  style={[sg.followBtn, followed && sg.followBtnDone]}
+                  onPress={() => handleFollow(item.id)}
+                  disabled={followed}
+                >
+                  <Ionicons name={followed ? 'checkmark' : 'add'} size={15} color={followed ? C.success : '#fff'} />
+                  <Text style={[sg.followBtnText, followed && { color: C.success }]}>{followed ? 'Following' : 'Follow'}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function MixesScreen() {
-  const { session, user } = useAuthStore();
+  const { session, user, initialized } = useAuthStore();
   const [mixes, setMixes] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -409,7 +562,7 @@ export default function MixesScreen() {
     setRefreshing(false);
   }, [filter, genre, feedMode, followingIds]);
 
-  useEffect(() => { fetchMixes(); }, [fetchMixes]);
+  useEffect(() => { if (initialized) fetchMixes(); }, [initialized, fetchMixes]);
 
   const filtered = search
     ? mixes.filter(m => {
@@ -500,7 +653,13 @@ export default function MixesScreen() {
 
       {/* Feed */}
       {loading ? (
-        <ActivityIndicator size="large" color={C.accent} style={{ marginTop: 60 }} />
+        <FlatList
+          data={[1, 2, 3, 4, 5]}
+          keyExtractor={i => String(i)}
+          contentContainerStyle={{ padding: 16, gap: 12 }}
+          scrollEnabled={false}
+          renderItem={() => <MixCardSkeleton />}
+        />
       ) : feedMode === 'following' && !session ? (
         <View style={s.empty}>
           <Ionicons name="person-outline" size={48} color={C.textMuted} />
@@ -508,11 +667,13 @@ export default function MixesScreen() {
           <Text style={s.emptyBody}>Follow DJs to see their latest mixes here.</Text>
         </View>
       ) : feedMode === 'following' && followingIds.length === 0 ? (
-        <View style={s.empty}>
-          <Ionicons name="people-outline" size={48} color={C.textMuted} />
-          <Text style={s.emptyTitle}>No one followed yet</Text>
-          <Text style={s.emptyBody}>Head to the Directory and follow some DJs to see their mixes here.</Text>
-        </View>
+        <SuggestedDJs
+          currentUserId={user!.id}
+          onFollowed={() => {
+            supabase.from('follows').select('following_id').eq('follower_id', user!.id)
+              .then(({ data }) => setFollowingIds((data ?? []).map((r: any) => r.following_id)));
+          }}
+        />
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
           <Ionicons name="musical-notes-outline" size={48} color={C.textMuted} />
@@ -527,6 +688,10 @@ export default function MixesScreen() {
           keyExtractor={m => m.id}
           contentContainerStyle={{ padding: 16, gap: 12 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          initialNumToRender={6}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -571,6 +736,32 @@ const s = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text, marginTop: 14, marginBottom: 6 },
   emptyBody: { fontSize: 14, color: C.textSec, textAlign: 'center', lineHeight: 21 },
+});
+
+const sg = StyleSheet.create({
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+  heading: { fontSize: 16, fontWeight: '700', color: C.text },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10, backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 9 },
+  searchInput: { flex: 1, fontSize: 14, color: C.text },
+  genrePill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
+  genrePillActive: { borderColor: C.accent, backgroundColor: C.accentDim + '20' },
+  genrePillText: { fontSize: 12, fontWeight: '600', color: C.textMuted },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 12 },
+  avatarWrap: { width: 46, height: 46 },
+  avatar: { width: 46, height: 46, borderRadius: 23 },
+  avatarPlaceholder: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.accentDim + '50', alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontSize: 18, fontWeight: '700', color: C.accent },
+  name: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 4 },
+  metaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 3 },
+  metaChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metaChipText: { fontSize: 11, fontWeight: '600', color: C.accent },
+  bio: { fontSize: 12, color: C.textMuted },
+  followBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: C.accent },
+  followBtnDone: { backgroundColor: C.success + '20', borderWidth: 1, borderColor: C.success + '60' },
+  followBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  empty: { alignItems: 'center', paddingTop: 40, gap: 10 },
+  emptyText: { fontSize: 15, color: C.textSec, textAlign: 'center' },
+  clearText: { fontSize: 13, color: C.accent, fontWeight: '600' },
 });
 
 const mc = StyleSheet.create({

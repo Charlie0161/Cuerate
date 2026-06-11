@@ -139,23 +139,33 @@ export function AddTrackModal({ visible, onClose, onAdd }: AddTrackModalProps) {
 
   // ── Search ─────────────────────────────────────────────────────────────────
   const doSearch = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
-      // Full-text search on title + artist
-      const { data, error } = await supabase
+      let query = supabase
         .from('track_submissions')
         .select('id, title, artist, bpm, camelot_key, musical_key, energy, platform, external_url, thumbnail_url, status')
-        .or(`title.ilike.%${q}%,artist.ilike.%${q}%`)
         .in('status', ['ready', 'pending', 'analysing'])
-        .order('status')           // ready first
-        .limit(20);
+        .order('status')
+        .order('title', { ascending: true });
+
+      if (q.trim()) {
+        // Title-only match — typing "What" should NOT surface tracks by artist "Versatile"
+        query = query.ilike('title', `%${q.trim()}%`);
+      }
+
+      const { data, error } = await query.limit(50);
       if (!error && data) setResults(data as SubmittedTrack[]);
     } finally {
       setSearching(false);
     }
   }, []);
 
+  // Load all tracks immediately when modal opens
+  useEffect(() => {
+    if (visible) doSearch('');
+  }, [visible, doSearch]);
+
+  // Debounced search as user types
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => doSearch(query), 350);
@@ -192,7 +202,7 @@ export function AddTrackModal({ visible, onClose, onAdd }: AddTrackModalProps) {
     onClose();
   };
 
-  const handleClose = () => { resetManual(); setQuery(''); setResults([]); setAddedIds(new Set()); onClose(); };
+  const handleClose = () => { resetManual(); setQuery(''); setAddedIds(new Set()); onClose(); };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
@@ -256,12 +266,12 @@ export function AddTrackModal({ visible, onClose, onAdd }: AddTrackModalProps) {
                 </View>
               )}
 
-              {results.length === 0 && query.length === 0 && (
+              {results.length === 0 && query.length === 0 && !searching && (
                 <View style={as.emptySearch}>
                   <Ionicons name="musical-notes-outline" size={32} color={C.textMuted} />
-                  <Text style={as.emptyTitle}>Search the track database</Text>
+                  <Text style={as.emptyTitle}>No tracks in the database yet</Text>
                   <Text style={as.emptyBody}>
-                    Tracks submitted on cuerate.co.uk are automatically analysed for BPM and key. Search to find and add them to your crate.
+                    Submit tracks on <Text style={{ color: C.accent }}>cuerate.co.uk</Text> and they'll be analysed for BPM and key automatically.
                   </Text>
                 </View>
               )}

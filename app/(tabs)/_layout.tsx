@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
@@ -10,9 +9,7 @@ const MUTED = '#52516A';
 const SURFACE = '#13131A';
 
 export default function TabLayout() {
-  const initialize = useAuthStore(s => s.initialize);
   const profile = useAuthStore(s => s.profile);
-  useEffect(() => { initialize(); }, []);
 
   const isFan = profile?.account_type === 'fan';
 

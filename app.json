@@ -1,14 +1,20 @@
 {
   "expo": {
-    "name": "BoothBuddy",
-    "slug": "boothbuddy",
-    "scheme": "boothbuddy",
+    "name": "Cuerate",
+    "slug": "cuerate",
+    "scheme": "cuerate",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0C"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cuerate.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +33,13 @@
       "expo-router",
       "expo-document-picker",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cuerate uses your photos to set your profile picture."
+        }
+      ]
     ]
   }
 }

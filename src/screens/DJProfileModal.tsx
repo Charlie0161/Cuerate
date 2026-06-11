@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, Modal, ScrollView, TouchableOpacity,
-  StyleSheet, Image, Linking, ActivityIndicator,
+  StyleSheet, Image, Linking, ActivityIndicator, Alert, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,9 @@ import { useAuthStore } from '../store/authStore';
 import { DJProfile } from './DJDirectoryScreen';
 import MessagesScreen from './MessagesScreen';
 import AddDJReviewModal from './AddDJReviewModal';
+import { sendPushNotification } from '../lib/notifications';
+import ReportUserModal from './ReportUserModal';
+import * as Haptics from 'expo-haptics';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -56,6 +59,47 @@ const PLATFORM_COLORS: Record<string, string> = {
   soundcloud: '#FF5500', youtube: '#FF0000', mixcloud: '#5000FF',
 };
 
+function SoundCloudCard({ url }: { url: string }) {
+  const [title, setTitle] = useState<string | null>(null);
+  const [thumb, setThumb] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`)
+      .then(r => r.json())
+      .then(d => {
+        setTitle(d.title ?? null);
+        setThumb(d.thumbnail_url ?? null);
+      })
+      .catch(() => {});
+  }, [url]);
+
+  return (
+    <TouchableOpacity style={p.previewWrap} onPress={() => Linking.openURL(url)} activeOpacity={0.85}>
+      <View style={p.previewHeader}>
+        <Ionicons name="musical-note" size={13} color={C.soundcloud} />
+        <Text style={[p.previewLabel, { color: C.soundcloud }]}>SoundCloud preview</Text>
+        <Ionicons name="open-outline" size={13} color={C.textMuted} style={{ marginLeft: 'auto' }} />
+      </View>
+      <View style={p.ytThumbWrap}>
+        {thumb
+          ? <Image source={{ uri: thumb }} style={p.ytThumb} resizeMode="cover" />
+          : <View style={[p.ytThumb, { backgroundColor: '#1A0A00', alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="musical-notes" size={40} color={C.soundcloud + '60'} />
+            </View>
+        }
+        <View style={p.ytPlayBtn}>
+          <View style={p.scPlayCircle}>
+            <Ionicons name="play" size={22} color="#fff" />
+          </View>
+          {title && (
+            <Text style={p.scTitle} numberOfLines={2}>{title}</Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 interface DJProfileModalProps {
   dj: DJProfile;
   onClose: () => void;
@@ -72,6 +116,8 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
   const [followLoading, setFollowLoading] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [userReview, setUserReview] = useState<any>(null);
@@ -88,13 +134,12 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
         .eq('following_id', dj.id);
       setFollowerCount(count ?? 0);
       if (user && !isOwnProfile) {
-        const { data } = await supabase
-          .from('follows')
-          .select('id')
-          .eq('follower_id', user.id)
-          .eq('following_id', dj.id)
-          .maybeSingle();
-        setIsFollowing(!!data);
+        const [followRes, blockRes] = await Promise.all([
+          supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', dj.id).maybeSingle(),
+          supabase.from('user_blocks').select('id').eq('blocker_id', user.id).eq('blocked_id', dj.id).maybeSingle(),
+        ]);
+        setIsFollowing(!!followRes.data);
+        setIsBlocked(!!blockRes.data);
       }
     }
     fetchFollowData();
@@ -112,8 +157,32 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
       await supabase.from('follows').insert({ follower_id: user.id, following_id: dj.id });
       setIsFollowing(true);
       setFollowerCount(c => c + 1);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const myName = (await supabase.from('profiles').select('dj_name').eq('id', user.id).single()).data?.dj_name ?? 'Someone';
+      await sendPushNotification(dj.id, `${myName} followed you`, 'Check out their profile on Cuerate.', { screen: 'directory' });
     }
     setFollowLoading(false);
+  }
+
+  async function toggleBlock() {
+    if (!user) return;
+    if (isBlocked) {
+      await supabase.from('user_blocks').delete().eq('blocker_id', user.id).eq('blocked_id', dj.id);
+      setIsBlocked(false);
+    } else {
+      Alert.alert(
+        `Block ${dj.dj_name}?`,
+        'They won\'t appear in your feed or directory. You can unblock them from their profile.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Block', style: 'destructive', onPress: async () => {
+            await supabase.from('user_blocks').insert({ blocker_id: user.id, blocked_id: dj.id });
+            setIsBlocked(true);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          }},
+        ]
+      );
+    }
   }
 
   async function fetchReviews() {
@@ -223,6 +292,42 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
               <Text style={p.bio}>{dj.bio}</Text>
             ) : null}
 
+            {/* Preview track */}
+            {dj.preview_track_url && (() => {
+              const raw = dj.preview_track_url.trim();
+              const ytMatch = raw.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+              const ytId = ytMatch?.[1];
+              const isSoundCloud = raw.includes('soundcloud.com');
+              const scUrl = raw.split('?')[0].split('#')[0];
+              if (!ytId && !isSoundCloud) return null;
+
+              if (ytId) {
+                // YouTube: thumbnail card — embedding is commonly blocked by video owners
+                return (
+                  <TouchableOpacity style={p.previewWrap} onPress={() => Linking.openURL(raw)} activeOpacity={0.85}>
+                    <View style={p.previewHeader}>
+                      <Ionicons name="logo-youtube" size={13} color="#FF0000" />
+                      <Text style={[p.previewLabel, { color: '#FF0000' }]}>YouTube preview</Text>
+                      <Ionicons name="open-outline" size={13} color={C.textMuted} style={{ marginLeft: 'auto' }} />
+                    </View>
+                    <View style={p.ytThumbWrap}>
+                      <Image
+                        source={{ uri: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` }}
+                        style={p.ytThumb}
+                        resizeMode="cover"
+                      />
+                      <View style={p.ytPlayBtn}>
+                        <Ionicons name="play" size={28} color="#fff" />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }
+
+              // SoundCloud: tap-to-open card with oEmbed artwork
+              return <SoundCloudCard url={scUrl} />;
+            })()}
+
             {/* Stats row */}
             <View style={p.statsRow}>
               <View style={p.statItem}>
@@ -293,7 +398,27 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
                   <Text style={[p.actionBtnText, { color: C.accent }]}>Message</Text>
                 </TouchableOpacity>
               )}
+              <TouchableOpacity
+                style={[p.actionBtn, { backgroundColor: C.raised, borderColor: C.border }]}
+                onPress={() => Share.share({ message: `Check out ${dj.dj_name} on Cuerate\nhttps://cuerate.co.uk/dj/${dj.id}` })}
+              >
+                <Ionicons name="share-outline" size={15} color={C.textSec} />
+                <Text style={[p.actionBtnText, { color: C.textSec }]}>Share</Text>
+              </TouchableOpacity>
             </View>
+
+            {!isOwnProfile && user && (
+              <View style={p.modActions}>
+                <TouchableOpacity style={p.modBtn} onPress={toggleBlock}>
+                  <Ionicons name={isBlocked ? 'eye-outline' : 'eye-off-outline'} size={13} color={C.textMuted} />
+                  <Text style={p.modBtnText}>{isBlocked ? 'Unblock' : 'Block'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={p.modBtn} onPress={() => setShowReport(true)}>
+                  <Ionicons name="flag-outline" size={13} color={C.textMuted} />
+                  <Text style={p.modBtnText}>Report</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Tabs */}
@@ -469,6 +594,14 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
             onSuccess={() => { setShowReviewModal(false); fetchReviews(); }}
           />
         )}
+        {showReport && user && (
+          <ReportUserModal
+            reportedId={dj.id}
+            reportedName={dj.dj_name}
+            reporterId={user.id}
+            onClose={() => setShowReport(false)}
+          />
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -487,12 +620,24 @@ const p = StyleSheet.create({
   metaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: C.raised, borderWidth: 1, borderColor: C.border },
   metaChipText: { fontSize: 12, color: C.textMuted, fontWeight: '500' },
   bio: { fontSize: 14, color: C.textSec, textAlign: 'center', lineHeight: 20, marginTop: 12, paddingHorizontal: 8 },
+  previewWrap: { width: '100%', marginTop: 16, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.border, backgroundColor: C.raised },
+  previewHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8 },
+  previewLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  previewPlayer: { width: '100%', height: 166, backgroundColor: 'transparent' },
+  ytThumbWrap: { width: '100%', height: 180, position: 'relative' },
+  ytThumb: { width: '100%', height: '100%' },
+  ytPlayBtn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000055' },
+  scPlayCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.soundcloud, alignItems: 'center', justifyContent: 'center' },
+  scTitle: { fontSize: 13, fontWeight: '600', color: '#fff', textAlign: 'center', marginTop: 10, paddingHorizontal: 16, textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginTop: 16, overflow: 'hidden' },
   statItem: { flex: 1, alignItems: 'center', paddingVertical: 14 },
   statVal: { fontSize: 22, fontWeight: '700', color: C.text },
   statLabel: { fontSize: 11, color: C.textMuted, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
   statDivider: { width: 1, height: '60%', backgroundColor: C.border },
   actions: { flexDirection: 'row', gap: 10, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' },
+  modActions: { flexDirection: 'row', gap: 16, marginTop: 12 },
+  modBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  modBtnText: { fontSize: 12, color: C.textMuted },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
   actionBtnText: { fontSize: 14, fontWeight: '600' },
   tabRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.border, marginTop: 8 },

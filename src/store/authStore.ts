@@ -38,10 +38,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!user) return;
     set({ loading: true });
     try {
+      // Upsert ensures new users always get a profile row on first load
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .upsert(
+          { id: user.id, email: user.email ?? null, updated_at: new Date().toISOString() },
+          { onConflict: 'id', ignoreDuplicates: true }
+        )
+        .select()
         .single();
       if (!error && data) set({ profile: data });
     } finally {
@@ -50,12 +54,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   updateProfile: async (updates) => {
-    const { user, profile } = get();
+    const { user } = get();
     if (!user) return;
     const { data, error } = await supabase
       .from('profiles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', user.id)
+      .upsert({ id: user.id, ...updates, updated_at: new Date().toISOString() })
       .select()
       .single();
     if (!error && data) set({ profile: data });

@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { sendPushNotification } from '../lib/notifications';
+import * as Haptics from 'expo-haptics';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -95,15 +97,34 @@ export default function ConversationScreen({ conversationId, otherName, onBack }
     const content = input.trim();
     setInput('');
     setSending(true);
-    await supabase.from('messages').insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content,
-    });
-    await supabase
-      .from('conversations')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', conversationId);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Insert message + update conversation timestamp in parallel
+    const [, , convRes, profileRes] = await Promise.all([
+      supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content,
+      }),
+      supabase
+        .from('conversations')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', conversationId),
+      supabase
+        .from('conversations')
+        .select('participant_1, participant_2')
+        .eq('id', conversationId)
+        .single(),
+      supabase.from('profiles').select('dj_name').eq('id', user.id).single(),
+    ]);
+
+    const conv = convRes.data;
+    if (conv) {
+      const recipientId = conv.participant_1 === user.id ? conv.participant_2 : conv.participant_1;
+      const senderName = profileRes.data?.dj_name ?? 'Someone';
+      sendPushNotification(recipientId, `New message from ${senderName}`, content, { screen: 'messages', conversationId });
+    }
+
     setSending(false);
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
   }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, Image, ActivityIndicator, ScrollView, Alert, Modal,
+  StatusBar, Image, ActivityIndicator, ScrollView, Alert, Modal, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,9 @@ import PostBookingRequestModal from './PostBookingRequestModal';
 import VenueProfileModal from './VenueProfileModal';
 import { Venue } from './VenueDirectoryScreen';
 import AdminScreen from './AdminScreen';
+import FeedbackModal from './FeedbackModal';
+import DJProfileModal from './DJProfileModal';
+import { DJProfile } from './DJDirectoryScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -41,6 +44,7 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [genre, setGenre] = useState(profile?.genre ?? '');
   const [location, setLocation] = useState(profile?.location ?? '');
   const [bookingEmail, setBookingEmail] = useState(profile?.booking_email ?? '');
+  const [previewTrackUrl, setPreviewTrackUrl] = useState(profile?.preview_track_url ?? '');
   const [isPublic, setIsPublic] = useState(profile?.is_public ?? false);
   const [activeTab, setActiveTab] = useState<'dj' | 'venue'>('dj');
 
@@ -54,6 +58,8 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [myVenue, setMyVenue] = useState<Venue | null>(null);
   const [showMyVenue, setShowMyVenue] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
@@ -79,32 +85,26 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   async function fetchVenueData() {
     if (!user) return;
     setAppsLoading(true);
+    // Single query — join slots → applications → DJ profiles in one round-trip
     const { data: slots } = await supabase
       .from('booking_requests')
-      .select('*')
+      .select(`
+        *,
+        booking_applications (
+          *,
+          profiles:dj_id (id, dj_name, booking_email, avatar_url)
+        )
+      `)
       .eq('venue_id', user.id)
       .eq('status', 'open')
       .order('created_at', { ascending: false });
+
     setGigSlots(slots ?? []);
     if (slots && slots.length > 0) {
-      const ids = slots.map((s: any) => s.id);
-      const { data: apps } = await supabase
-        .from('booking_applications')
-        .select('*')
-        .in('request_id', ids)
-        .order('created_at', { ascending: false });
-
-      if (apps && apps.length > 0) {
-        const djIds = [...new Set(apps.map((a: any) => a.dj_id))];
-        const { data: djProfiles } = await supabase
-          .from('profiles')
-          .select('id, dj_name, booking_email, avatar_url')
-          .in('id', djIds);
-        const profileMap = Object.fromEntries((djProfiles ?? []).map((p: any) => [p.id, p]));
-        setApplications(apps.map((a: any) => ({ ...a, profiles: profileMap[a.dj_id] ?? null })));
-      } else {
-        setApplications(apps ?? []);
-      }
+      const apps = slots.flatMap((s: any) =>
+        (s.booking_applications ?? []).map((a: any) => ({ ...a, profiles: a.profiles ?? null }))
+      );
+      setApplications(apps);
     }
     setAppsLoading(false);
   }
@@ -151,8 +151,15 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   }
 
   async function saveProfile() {
+    const cleanPreview = previewTrackUrl.trim();
+    const isYouTube = cleanPreview.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+    const isSoundCloud = cleanPreview.match(/^https:\/\/(www\.)?soundcloud\.com\/.+\/.+/);
+    if (cleanPreview && !isYouTube && !isSoundCloud) {
+      Alert.alert('Invalid URL', 'Paste a YouTube or SoundCloud link.\n\nYouTube: youtube.com/watch?v=...\nSoundCloud: soundcloud.com/artist/track');
+      return;
+    }
     setSaving(true);
-    await updateProfile({ dj_name: djName.trim(), bio: bio.trim(), genre: genre || null, location: location.trim() || null, booking_email: bookingEmail.trim() || null, is_public: isPublic });
+    await updateProfile({ dj_name: djName.trim(), bio: bio.trim(), genre: genre || null, location: location.trim() || null, booking_email: bookingEmail.trim() || null, is_public: isPublic, preview_track_url: cleanPreview || null });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -268,18 +275,20 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
     setAvatarLoading(true);
     try {
       const asset = result.assets[0];
-      const ext = asset.uri.split('.').pop() ?? 'jpg';
+      const ext = (asset.uri.split('.').pop() ?? 'jpg').toLowerCase();
+      const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
       const fileName = `${user?.id}-${Date.now()}.${ext}`;
-      const formData = new FormData();
-      formData.append('file', { uri: asset.uri, name: fileName, type: `image/${ext}` } as any);
+      // Fetch raw bytes — FormData upload is unreliable in React Native
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
       const { error } = await supabase.storage
         .from('avatars')
-        .upload(fileName, formData, { upsert: true });
+        .upload(fileName, blob, { contentType: mime, upsert: true });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
       await updateProfile({ avatar_url: urlData.publicUrl });
-    } catch {
-      Alert.alert('Upload failed', 'Could not upload photo. Try again.');
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message ?? 'Could not upload photo. Check storage bucket exists and RLS allows uploads.');
     } finally {
       setAvatarLoading(false);
     }
@@ -383,6 +392,19 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
             </View>
           </TouchableOpacity>
           <Text style={s.avatarHint}>Tap to change photo</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            <TouchableOpacity style={s.previewProfileBtn} onPress={() => setShowPreview(true)}>
+              <Ionicons name="eye-outline" size={14} color={C.accent} />
+              <Text style={s.previewProfileBtnText}>Preview</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.previewProfileBtn}
+              onPress={() => Share.share({ message: `Check out my Cuerate profile\nhttps://cuerate.co.uk/dj/${user?.id}` })}
+            >
+              <Ionicons name="share-outline" size={14} color={C.accent} />
+              <Text style={s.previewProfileBtnText}>Share profile</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── DJ TAB ── */}
@@ -464,6 +486,29 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
               <TextInput style={s.field} value={bookingEmail} onChangeText={setBookingEmail}
                 placeholder="bookings@youremail.com" placeholderTextColor={C.textMuted}
                 keyboardType="email-address" autoCapitalize="none" />
+            </View>
+
+            <Text style={[s.fieldLabel, { marginTop: 16 }]}>
+              Preview track <Text style={{ color: C.textMuted, fontWeight: '400' }}>(SoundCloud link)</Text>
+            </Text>
+            <Text style={s.fieldHint}>Paste a YouTube or SoundCloud link — plays on your profile.</Text>
+            <View style={s.fieldRow}>
+              <Ionicons name="musical-note-outline" size={16} color={C.soundcloud} style={{ marginRight: 10 }} />
+              <TextInput
+                style={s.field}
+                value={previewTrackUrl}
+                onChangeText={setPreviewTrackUrl}
+                placeholder="youtube.com/watch?v=... or soundcloud.com/..."
+                placeholderTextColor={C.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              {previewTrackUrl !== '' && (
+                <TouchableOpacity onPress={() => setPreviewTrackUrl('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={16} color={C.textMuted} />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -675,6 +720,52 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </View>
         )}
 
+        {/* Profile completion prompt — DJs only */}
+        {profile?.account_type !== 'fan' && profile?.account_type !== 'venue' && (() => {
+          const missing = [];
+          if (!profile?.dj_name) missing.push('DJ name');
+          if (!profile?.bio) missing.push('bio');
+          if (!profile?.genre) missing.push('genre');
+          if (!profile?.soundcloud_url) missing.push('SoundCloud');
+          if (missing.length === 0) return null;
+          return (
+            <TouchableOpacity style={s.completionBanner} onPress={() => setActiveTab('dj')} activeOpacity={0.8}>
+              <View style={s.completionIcon}>
+                <Ionicons name="person-circle-outline" size={22} color={C.warning} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.completionTitle}>Complete your profile</Text>
+                <Text style={s.completionSub}>Missing: {missing.join(', ')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={C.warning} />
+            </TouchableOpacity>
+          );
+        })()}
+
+        {/* Role switcher */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Account type</Text>
+          <View style={s.roleRow}>
+            {[
+              { id: 'dj',   label: 'DJ',         icon: 'headset-outline' },
+              { id: 'fan',  label: 'Music Fan',   icon: 'musical-note-outline' },
+            ].map(r => (
+              <TouchableOpacity
+                key={r.id}
+                style={[s.rolePill, profile?.account_type === r.id && s.rolePillActive]}
+                onPress={async () => {
+                  if (profile?.account_type === r.id) return;
+                  await updateProfile({ account_type: r.id as any });
+                }}
+              >
+                <Ionicons name={r.icon as any} size={14} color={profile?.account_type === r.id ? C.accent : C.textMuted} />
+                <Text style={[s.rolePillText, profile?.account_type === r.id && s.rolePillTextActive]}>{r.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={s.roleHint}>Changing role updates which tabs you see.</Text>
+        </View>
+
         {/* Admin panel */}
         {profile?.is_admin && (
           <TouchableOpacity style={s.adminBtn} onPress={() => setShowAdmin(true)}>
@@ -687,10 +778,15 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
         {/* Account */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Account</Text>
-          <TouchableOpacity style={s.dangerBtn} onPress={handleSignOut}>
+          <TouchableOpacity style={s.feedbackBtn} onPress={() => setShowFeedback(true)}>
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color={C.accent} />
+            <Text style={s.feedbackBtnText}>Send beta feedback</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.dangerBtn, { marginTop: 8 }]} onPress={handleSignOut}>
             <Ionicons name="log-out-outline" size={16} color={C.critical} />
             <Text style={s.dangerBtnText}>Sign out</Text>
           </TouchableOpacity>
+          <Text style={s.versionText}>Cuerate v1.0.0 · Beta</Text>
         </View>
 
         <View style={{ height: 40 }} />
@@ -708,6 +804,29 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
         <Modal visible animationType="slide" presentationStyle="pageSheet">
           <AdminScreen onClose={() => setShowAdmin(false)} />
         </Modal>
+      )}
+
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
+      {showPreview && profile && user && (
+        <DJProfileModal
+          dj={{
+            id: user.id,
+            dj_name: profile.dj_name ?? 'Your Name',
+            bio: profile.bio,
+            avatar_url: profile.avatar_url,
+            soundcloud_url: profile.soundcloud_url,
+            soundcloud_username: profile.soundcloud_username,
+            genre: profile.genre,
+            location: profile.location,
+            booking_email: profile.booking_email,
+            preview_track_url: profile.preview_track_url,
+            mix_count: 0,
+            track_count: 0,
+            created_at: profile.created_at,
+          } as DJProfile}
+          onClose={() => setShowPreview(false)}
+        />
       )}
 
       {showMyVenue && myVenue && (
@@ -739,10 +858,13 @@ const s = StyleSheet.create({
   avatarInitials: { fontSize: 32, fontWeight: '700', color: C.accent },
   avatarEditBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
   avatarHint: { fontSize: 12, color: C.textMuted, marginTop: 8 },
+  previewProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.accentDim, backgroundColor: C.accentDim + '20' },
+  previewProfileBtnText: { fontSize: 13, fontWeight: '600', color: C.accent },
   card: { backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 16 },
   cardTitle: { fontSize: 13, fontWeight: '600', color: C.textSec, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 14 },
   fieldWrap: { marginBottom: 14 },
   fieldLabel: { fontSize: 12, fontWeight: '600', color: C.textSec, marginBottom: 6 },
+  fieldHint: { fontSize: 11, color: C.textMuted, marginBottom: 8, lineHeight: 16 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.raised, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 46 },
   field: { flex: 1, fontSize: 15, color: C.text },
   bioField: { backgroundColor: C.raised, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: C.text, minHeight: 80, textAlignVertical: 'top' },
@@ -772,6 +894,19 @@ const s = StyleSheet.create({
   toggleThumbOn: { backgroundColor: '#7C5CFC', alignSelf: 'flex-end' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.criticalBg, borderRadius: 10, borderWidth: 1, borderColor: C.critical + '40' },
   dangerBtnText: { fontSize: 15, color: C.critical, fontWeight: '600' },
+  completionBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1A1300', borderWidth: 1, borderColor: '#F5A62340', borderRadius: 14, padding: 14, marginBottom: 12 },
+  completionIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5A62318', alignItems: 'center', justifyContent: 'center' },
+  completionTitle: { fontSize: 14, fontWeight: '700', color: '#F5A623', marginBottom: 2 },
+  completionSub: { fontSize: 12, color: C.textSec },
+  roleRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  rolePill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.raised },
+  rolePillActive: { borderColor: C.accent, backgroundColor: C.accentDim + '30' },
+  rolePillText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  rolePillTextActive: { color: C.accent },
+  roleHint: { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  feedbackBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.accentDim + '20', borderRadius: 10, borderWidth: 1, borderColor: C.accent + '40' },
+  feedbackBtnText: { fontSize: 15, color: C.accent, fontWeight: '600' },
+  versionText: { fontSize: 11, color: C.textMuted, textAlign: 'center', marginTop: 14 },
   adminBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1A1400', borderWidth: 1, borderColor: '#F0C04040', borderRadius: 14, padding: 16, marginBottom: 12 },
   adminBtnEmoji: { fontSize: 20 },
   adminBtnText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#F0C040' },
