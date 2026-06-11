@@ -28,6 +28,8 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [djName, setDjName] = useState('');
+  const [accountType, setAccountType] = useState<'dj' | 'venue'>('dj');
+  const [venueName, setVenueName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,7 +54,7 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
           email: email.trim(),
           password,
           options: {
-            data: { full_name: djName.trim() || email.split('@')[0] },
+            data: { full_name: djName.trim() || email.split('@')[0], account_type: accountType },
           },
         });
         if (error) throw error;
@@ -166,15 +168,46 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
           {/* Form */}
           <View style={s.form}>
             {mode === 'signup' && (
-              <View style={s.fieldWrap}>
-                <Text style={s.fieldLabel}>DJ name</Text>
-                <View style={s.fieldRow}>
-                  <Ionicons name="person-outline" size={16} color={C.textMuted} style={s.fieldIcon} />
-                  <TextInput style={s.field} placeholder="Your DJ name"
-                    placeholderTextColor={C.textMuted} value={djName}
-                    onChangeText={setDjName} autoCapitalize="words" />
+              <>
+                {/* Account type picker */}
+                <View style={s.fieldWrap}>
+                  <Text style={s.fieldLabel}>I am a…</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {([['dj', 'DJ / Artist', 'headphones-outline'], ['venue', 'Venue / Promoter', 'business-outline']] as const).map(([type, label, icon]) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[s.accountTypeBtn, accountType === type && s.accountTypeBtnActive]}
+                        onPress={() => setAccountType(type)}
+                      >
+                        <Ionicons name={icon as any} size={18} color={accountType === type ? C.accent : C.textMuted} />
+                        <Text style={[s.accountTypeBtnText, accountType === type && { color: C.accent }]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+
+                {accountType === 'dj' ? (
+                  <View style={s.fieldWrap}>
+                    <Text style={s.fieldLabel}>DJ name</Text>
+                    <View style={s.fieldRow}>
+                      <Ionicons name="person-outline" size={16} color={C.textMuted} style={s.fieldIcon} />
+                      <TextInput style={s.field} placeholder="Your DJ name"
+                        placeholderTextColor={C.textMuted} value={djName}
+                        onChangeText={setDjName} autoCapitalize="words" />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={s.fieldWrap}>
+                    <Text style={s.fieldLabel}>Venue name</Text>
+                    <View style={s.fieldRow}>
+                      <Ionicons name="business-outline" size={16} color={C.textMuted} style={s.fieldIcon} />
+                      <TextInput style={s.field} placeholder="Your venue name"
+                        placeholderTextColor={C.textMuted} value={venueName}
+                        onChangeText={setVenueName} autoCapitalize="words" />
+                    </View>
+                  </View>
+                )}
+              </>
             )}
 
             <View style={s.fieldWrap}>
@@ -301,5 +334,8 @@ const s = StyleSheet.create({
   dividerText: { fontSize: 13, color: C.textMuted },
   socialBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 12, height: 52, borderWidth: 1 },
   socialBtnText: { fontSize: 15, fontWeight: '600' },
+  accountTypeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#2A2A38', backgroundColor: '#13131A' },
+  accountTypeBtnActive: { borderColor: '#7C5CFC', backgroundColor: 'rgba(61,46,138,0.2)' },
+  accountTypeBtnText: { fontSize: 13, fontWeight: '600', color: '#52516A' },
   legalText: { fontSize: 11, color: C.textMuted, textAlign: 'center', lineHeight: 16, marginTop: 24 },
 });

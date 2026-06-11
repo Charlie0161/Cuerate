@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import DJProfileModal from './DJProfileModal';
+import VenueDirectoryScreen from './VenueDirectoryScreen';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ export default function DJDirectoryScreen() {
   const [search, setSearch]       = useState('');
   const [genre, setGenre]         = useState('All');
   const [selectedDJ, setSelectedDJ] = useState<DJProfile | null>(null);
+  const [directoryTab, setDirectoryTab] = useState<'djs' | 'venues'>('djs');
 
   const fetchDJs = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -180,13 +182,30 @@ export default function DJDirectoryScreen() {
       <View style={d.header}>
         <View>
           <Text style={d.eyebrow}>Cuerate</Text>
-          <Text style={d.title}>DJ Directory</Text>
-        </View>
-        <View style={d.headerMeta}>
-          <Text style={d.djCount}>{djs.length} DJs</Text>
+          <Text style={d.title}>Directory</Text>
         </View>
       </View>
 
+      {/* DJs / Venues toggle */}
+      <View style={d.toggle}>
+        <TouchableOpacity
+          style={[d.toggleBtn, directoryTab === 'djs' && d.toggleBtnActive]}
+          onPress={() => setDirectoryTab('djs')}
+        >
+          <Ionicons name="people-outline" size={15} color={directoryTab === 'djs' ? C.accent : C.textSec} />
+          <Text style={[d.toggleText, directoryTab === 'djs' && d.toggleTextActive]}>DJs</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[d.toggleBtn, directoryTab === 'venues' && d.toggleBtnActive]}
+          onPress={() => setDirectoryTab('venues')}
+        >
+          <Ionicons name="business-outline" size={15} color={directoryTab === 'venues' ? C.accent : C.textSec} />
+          <Text style={[d.toggleText, directoryTab === 'venues' && d.toggleTextActive]}>Venues</Text>
+        </TouchableOpacity>
+      </View>
+
+      {directoryTab === 'djs' && (
+        <>
       {/* Search bar */}
       <View style={d.searchBar}>
         <Ionicons name="search-outline" size={16} color={C.textMuted} />
@@ -253,6 +272,11 @@ export default function DJDirectoryScreen() {
         />
       )}
 
+        </>
+      )}
+
+      {directoryTab === 'venues' && <VenueDirectoryScreen />}
+
       {/* DJ profile modal */}
       {selectedDJ && (
         <DJProfileModal
@@ -302,6 +326,11 @@ const d = StyleSheet.create({
   statLabel: { fontSize: 10, color: C.textMuted },
   bookingBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: C.success + '12', borderWidth: 1, borderColor: C.success + '33' },
   bookingBadgeText: { fontSize: 9, fontWeight: '600', color: C.success },
+  toggle: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, marginHorizontal: 16, marginBottom: 12, padding: 4, gap: 4 },
+  toggleBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8 },
+  toggleBtnActive: { backgroundColor: C.raised },
+  toggleText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  toggleTextActive: { color: C.accent },
   // Empty state
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text, textAlign: 'center' },
