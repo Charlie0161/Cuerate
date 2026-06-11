@@ -37,16 +37,12 @@ export default function TabLayout() {
         title: 'Hardware',
         tabBarIcon: ({ color, size }) => <Ionicons name="hardware-chip-outline" color={color} size={size} />,
       }} />
-      <Tabs.Screen name="usb-check" options={{
-        title: 'USB Check',
-        tabBarIcon: ({ color, size }) => <Ionicons name="disc-outline" color={color} size={size} />,
-      }} />
       <Tabs.Screen name="mixes" options={{
         title: 'Mixes',
         tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline" color={color} size={size} />,
       }} />
-      <Tabs.Screen name="set-builder" options={{
-        title: 'Set Builder',
+      <Tabs.Screen name="prepare" options={{
+        title: 'Prepare',
         tabBarIcon: ({ color, size }) => <Ionicons name="musical-notes-outline" color={color} size={size} />,
       }} />
       <Tabs.Screen name="directory" options={{
@@ -61,14 +57,12 @@ export default function TabLayout() {
         title: 'Sets',
         tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} />,
       }} />
-      <Tabs.Screen name="calendar" options={{
-        title: 'Calendar',
-        tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
-      }} />
-      <Tabs.Screen name="gig-calc" options={{
-        title: 'Gig Calc',
-        tabBarIcon: ({ color, size }) => <Ionicons name="calculator-outline" color={color} size={size} />,
-      }} />
+
+      {/* Hidden legacy screens — still routable but not shown in tab bar */}
+      <Tabs.Screen name="usb-check" options={{ href: null }} />
+      <Tabs.Screen name="set-builder" options={{ href: null }} />
+      <Tabs.Screen name="calendar" options={{ href: null }} />
+      <Tabs.Screen name="gig-calc" options={{ href: null }} />
     </Tabs>
   );
 }

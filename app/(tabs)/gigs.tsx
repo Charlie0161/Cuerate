@@ -1,2 +1,2 @@
-import GigsScreen from '../../src/screens/GigsScreen';
-export default GigsScreen;
+import GigsHubScreen from '../../src/screens/GigsHubScreen';
+export default GigsHubScreen;
