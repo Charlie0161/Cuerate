@@ -11,7 +11,15 @@ const SURFACE = '#13131A';
 
 export default function TabLayout() {
   const initialize = useAuthStore(s => s.initialize);
+  const profile = useAuthStore(s => s.profile);
   useEffect(() => { initialize(); }, []);
+
+  const isFan = profile?.account_type === 'fan';
+
+  // Fans only see Mixes, Directory, Sets
+  const hide = (tab: string) => isFan && !['mixes', 'directory', 'festival-sets'].includes(tab)
+    ? { href: null as any }
+    : {};
 
   return (
     <Tabs
@@ -39,6 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{
         title: 'Hardware',
         tabBarIcon: ({ color, size }) => <Ionicons name="hardware-chip-outline" color={color} size={size} />,
+        ...hide('index'),
       }} />
       <Tabs.Screen name="mixes" options={{
         title: 'Mixes',
@@ -47,6 +56,7 @@ export default function TabLayout() {
       <Tabs.Screen name="prepare" options={{
         title: 'Prepare',
         tabBarIcon: ({ color, size }) => <Ionicons name="musical-notes-outline" color={color} size={size} />,
+        ...hide('prepare'),
       }} />
       <Tabs.Screen name="directory" options={{
         title: 'Directory',
@@ -55,13 +65,14 @@ export default function TabLayout() {
       <Tabs.Screen name="gigs" options={{
         title: 'Gigs',
         tabBarIcon: ({ color, size }) => <Ionicons name="megaphone-outline" color={color} size={size} />,
+        ...hide('gigs'),
       }} />
       <Tabs.Screen name="festival-sets" options={{
         title: 'Sets',
         tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} />,
       }} />
 
-      {/* Hidden legacy screens — still routable but not shown in tab bar */}
+      {/* Hidden legacy screens */}
       <Tabs.Screen name="usb-check" options={{ href: null }} />
       <Tabs.Screen name="set-builder" options={{ href: null }} />
       <Tabs.Screen name="calendar" options={{ href: null }} />

@@ -34,6 +34,12 @@ const ROLE_OPTIONS = [
     icon: 'swap-horizontal-outline' as const,
     desc: 'Switch between DJ and venue features freely.',
   },
+  {
+    id: 'fan',
+    label: 'Music Fan',
+    icon: 'musical-note-outline' as const,
+    desc: 'Follow DJs, discover mixes and submit tracks.',
+  },
 ];
 
 const FEATURES = [

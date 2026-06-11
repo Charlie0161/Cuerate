@@ -40,7 +40,7 @@ export type Profile = {
   is_public: boolean | null;
   is_pro: boolean | null;
   is_venue: boolean | null;
-  account_type: 'dj' | 'venue' | null;
+  account_type: 'dj' | 'venue' | 'fan' | null;
   is_admin: boolean | null;
   created_at: string;
   updated_at: string;

@@ -315,6 +315,11 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
                 <Text style={s.adminBadgeText}>👑 Admin</Text>
               </View>
             )}
+            {profile?.account_type === 'fan' && (
+              <View style={[s.adminBadge, { backgroundColor: C.accentDim + '30', borderColor: C.accent + '50' }]}>
+                <Text style={[s.adminBadgeText, { color: C.accent }]}>🎵 Music Fan</Text>
+              </View>
+            )}
           </View>
           <TouchableOpacity onPress={saveProfile} disabled={saving} style={s.saveBtn}>
             {saving
@@ -338,26 +343,28 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </View>
         </View>
 
-        {/* Role tab switcher */}
-        <View style={s.tabRow}>
-          <TouchableOpacity
-            style={[s.tab, activeTab === 'dj' && s.tabActive]}
-            onPress={() => setActiveTab('dj')}
-          >
-            <Ionicons name="musical-notes-outline" size={14} color={activeTab === 'dj' ? C.accent : C.textMuted} />
-            <Text style={[s.tabText, activeTab === 'dj' && s.tabTextActive]}>DJ Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.tab, activeTab === 'venue' && s.tabActive]}
-            onPress={() => setActiveTab('venue')}
-          >
-            <Ionicons name="business-outline" size={14} color={activeTab === 'venue' ? C.accent : C.textMuted} />
-            <Text style={[s.tabText, activeTab === 'venue' && s.tabTextActive]}>Venue</Text>
-            {profile?.is_venue && applications.filter(a => a.status === 'pending').length > 0 && (
-              <View style={s.tabDot} />
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Role tab switcher — hidden for fans */}
+        {profile?.account_type !== 'fan' && (
+          <View style={s.tabRow}>
+            <TouchableOpacity
+              style={[s.tab, activeTab === 'dj' && s.tabActive]}
+              onPress={() => setActiveTab('dj')}
+            >
+              <Ionicons name="musical-notes-outline" size={14} color={activeTab === 'dj' ? C.accent : C.textMuted} />
+              <Text style={[s.tabText, activeTab === 'dj' && s.tabTextActive]}>DJ Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.tab, activeTab === 'venue' && s.tabActive]}
+              onPress={() => setActiveTab('venue')}
+            >
+              <Ionicons name="business-outline" size={14} color={activeTab === 'venue' ? C.accent : C.textMuted} />
+              <Text style={[s.tabText, activeTab === 'venue' && s.tabTextActive]}>Venue</Text>
+              {profile?.is_venue && applications.filter(a => a.status === 'pending').length > 0 && (
+                <View style={s.tabDot} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Avatar */}
         <View style={[s.avatarSection, activeTab === 'venue' && { display: 'none' }]}>

@@ -82,6 +82,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const updates: Record<string, any> = {};
           if (role === 'venue') { updates.account_type = 'venue'; updates.is_venue = true; }
           else if (role === 'both') { updates.is_venue = true; }
+          else if (role === 'fan') { updates.account_type = 'fan'; }
           // 'dj' is the default — no changes needed
           if (Object.keys(updates).length > 0 && profile && !profile.is_venue) {
             await get().updateProfile(updates);
