@@ -67,10 +67,21 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
       const ids = slots.map((s: any) => s.id);
       const { data: apps } = await supabase
         .from('booking_applications')
-        .select('*, profiles:dj_id(dj_name, booking_email, avatar_url)')
+        .select('*')
         .in('request_id', ids)
         .order('created_at', { ascending: false });
-      setApplications(apps ?? []);
+
+      if (apps && apps.length > 0) {
+        const djIds = [...new Set(apps.map((a: any) => a.dj_id))];
+        const { data: djProfiles } = await supabase
+          .from('profiles')
+          .select('id, dj_name, booking_email, avatar_url')
+          .in('id', djIds);
+        const profileMap = Object.fromEntries((djProfiles ?? []).map((p: any) => [p.id, p]));
+        setApplications(apps.map((a: any) => ({ ...a, profiles: profileMap[a.dj_id] ?? null })));
+      } else {
+        setApplications(apps ?? []);
+      }
     }
     setAppsLoading(false);
   }
