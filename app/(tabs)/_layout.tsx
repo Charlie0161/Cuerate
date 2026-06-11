@@ -61,6 +61,10 @@ export default function TabLayout() {
         title: 'Sets',
         tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} />,
       }} />
+      <Tabs.Screen name="calendar" options={{
+        title: 'Calendar',
+        tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
+      }} />
       <Tabs.Screen name="gig-calc" options={{
         title: 'Gig Calc',
         tabBarIcon: ({ color, size }) => <Ionicons name="calculator-outline" color={color} size={size} />,

@@ -86,9 +86,18 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
     setAppsLoading(false);
   }
 
-  async function handleAccept(appId: string, djName: string, djEmail: string | null) {
+  async function handleAccept(appId: string, djName: string, djEmail: string | null, djId: string, slot: any) {
     await supabase.from('booking_applications').update({ status: 'accepted' }).eq('id', appId);
     setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'accepted' } : a));
+    // Auto-add to the DJ's gig calendar
+    await supabase.from('dj_gigs').insert({
+      dj_id: djId,
+      venue_name: slot.venue_name,
+      venue_id: user!.id,
+      date: slot.date,
+      fee: slot.fee_min ?? null,
+      source: 'booking',
+    });
     Alert.alert(
       `Accepted — ${djName}`,
       djEmail
@@ -566,7 +575,7 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
                             <View style={s.appActions}>
                               <TouchableOpacity
                                 style={s.acceptBtn}
-                                onPress={() => handleAccept(app.id, app.profiles?.dj_name ?? 'DJ', app.profiles?.booking_email)}
+                                onPress={() => handleAccept(app.id, app.profiles?.dj_name ?? 'DJ', app.profiles?.booking_email, app.dj_id, slot)}
                               >
                                 <Text style={s.acceptBtnText}>Accept</Text>
                               </TouchableOpacity>
