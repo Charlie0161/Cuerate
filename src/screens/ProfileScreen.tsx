@@ -21,6 +21,8 @@ const C = {
   soundcloud: '#FF5500', soundcloudBg: '#1A0E00',
 };
 
+const GENRES = ['House', 'Techno', 'Drum & Bass', 'UK Garage', 'Jungle', 'Trance', 'Hip-Hop', 'Afrobeats', 'Disco', 'Ambient', 'Other'];
+
 export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const { profile, user, updateProfile, signOut } = useAuthStore();
   const [djName, setDjName] = useState(profile?.dj_name ?? '');
@@ -32,10 +34,14 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   // Fallback: manual SoundCloud URL input
   const [showScManual, setShowScManual] = useState(false);
   const [scManualUrl, setScManualUrl] = useState(profile?.soundcloud_url ?? '');
+  const [genre, setGenre] = useState(profile?.genre ?? '');
+  const [location, setLocation] = useState(profile?.location ?? '');
+  const [bookingEmail, setBookingEmail] = useState(profile?.booking_email ?? '');
+  const [isPublic, setIsPublic] = useState(profile?.is_public ?? false);
 
   async function saveProfile() {
     setSaving(true);
-    await updateProfile({ dj_name: djName.trim(), bio: bio.trim() });
+    await updateProfile({ dj_name: djName.trim(), bio: bio.trim(), genre: genre || null, location: location.trim() || null, booking_email: bookingEmail.trim() || null, is_public: isPublic });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -247,6 +253,59 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           </View>
         </View>
 
+        {/* Directory */}
+        <View style={s.card}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <Text style={s.cardTitle}>DJ Directory</Text>
+            <TouchableOpacity
+              style={[s.toggleSwitch, isPublic && s.toggleSwitchOn]}
+              onPress={() => setIsPublic(!isPublic)}
+            >
+              <View style={[s.toggleThumb, isPublic && s.toggleThumbOn]} />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 12, color: C.textMuted, marginBottom: 14, lineHeight: 17 }}>
+            {isPublic ? '✓ Your profile is visible in the DJ Directory' : 'Enable to appear in the public DJ Directory'}
+          </Text>
+          <View style={s.fieldWrap}>
+            <Text style={s.fieldLabel}>Genre</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+              <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 4 }}>
+                {GENRES.map(g => (
+                  <TouchableOpacity
+                    key={g}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
+                      borderColor: genre === g ? C.accent : C.border,
+                      backgroundColor: genre === g ? C.accentDim + '33' : 'transparent',
+                    }}
+                    onPress={() => setGenre(genre === g ? '' : g)}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: genre === g ? C.accent : C.textMuted }}>{g}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+          <View style={s.fieldWrap}>
+            <Text style={s.fieldLabel}>Location</Text>
+            <View style={s.fieldRow}>
+              <Ionicons name="location-outline" size={16} color={C.textMuted} style={{ marginRight: 10 }} />
+              <TextInput style={s.field} value={location} onChangeText={setLocation}
+                placeholder="e.g. London, UK" placeholderTextColor={C.textMuted} />
+            </View>
+          </View>
+          <View style={s.fieldWrap}>
+            <Text style={s.fieldLabel}>Booking email <Text style={{ color: C.textMuted, fontWeight: '400' }}>(optional)</Text></Text>
+            <View style={s.fieldRow}>
+              <Ionicons name="mail-outline" size={16} color={C.textMuted} style={{ marginRight: 10 }} />
+              <TextInput style={s.field} value={bookingEmail} onChangeText={setBookingEmail}
+                placeholder="bookings@youremail.com" placeholderTextColor={C.textMuted}
+                keyboardType="email-address" autoCapitalize="none" />
+            </View>
+          </View>
+        </View>
+
         {/* SoundCloud */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Music</Text>
@@ -379,6 +438,10 @@ const s = StyleSheet.create({
   confirmBtn: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, backgroundColor: C.accentDim, borderWidth: 1, borderColor: C.accent },
   confirmBtnText: { fontSize: 13, color: C.accent, fontWeight: '600' },
   moreServicesNote: { fontSize: 12, color: C.textMuted, lineHeight: 18, marginTop: 4 },
+  toggleSwitch: { width: 44, height: 26, borderRadius: 13, backgroundColor: '#2A2A38', justifyContent: 'center', paddingHorizontal: 3 },
+  toggleSwitchOn: { backgroundColor: '#3D2E8A' },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#52516A' },
+  toggleThumbOn: { backgroundColor: '#7C5CFC', alignSelf: 'flex-end' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.criticalBg, borderRadius: 10, borderWidth: 1, borderColor: C.critical + '40' },
   dangerBtnText: { fontSize: 15, color: C.critical, fontWeight: '600' },
 });
