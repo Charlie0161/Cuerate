@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/authStore';
 import { Venue, StarRow, GearBadges } from './VenueDirectoryScreen';
 import AddVenueReviewModal from './AddVenueReviewModal';
 import ApplyForGigModal, { BookingRequest } from './ApplyForGigModal';
+import EditVenueModal from './EditVenueModal';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -54,16 +55,31 @@ interface VenueProfileModalProps {
   onReviewSubmitted: () => void;
 }
 
-export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }: VenueProfileModalProps) {
+export default function VenueProfileModal({ venue: initialVenue, onClose, onReviewSubmitted }: VenueProfileModalProps) {
+  const [venue, setVenue]               = useState(initialVenue);
   const [reviews, setReviews]           = useState<Review[]>([]);
   const [loading, setLoading]           = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showEditModal, setShowEditModal]     = useState(false);
   const [userReview, setUserReview]     = useState<Review | null>(null);
   const [gigSlots, setGigSlots]         = useState<BookingRequest[]>([]);
   const [appliedIds, setAppliedIds]     = useState<Set<string>>(new Set());
   const [applyTarget, setApplyTarget]   = useState<BookingRequest | null>(null);
+  const [claiming, setClaiming]         = useState(false);
   const { user, profile } = useAuthStore();
-  const isVenueAccount = (profile as any)?.account_type === 'venue';
+  const isVenueAccount = profile?.is_venue === true;
+  const isOwner = !!user && venue.owner_id === user.id;
+  const canClaim = !!user && isVenueAccount && !venue.owner_id && !isOwner;
+
+  async function handleClaim() {
+    if (!user) return;
+    setClaiming(true);
+    const { error } = await supabase.from('venues').update({ owner_id: user.id }).eq('id', venue.id);
+    if (!error) {
+      setVenue(v => ({ ...v, owner_id: user.id }));
+    }
+    setClaiming(false);
+  }
 
   const initial = venue.name[0].toUpperCase();
 
@@ -118,12 +134,26 @@ export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }:
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         <View style={p.topBar}>
           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={C.textSec} /></TouchableOpacity>
-          {user && !userReview && (
-            <TouchableOpacity style={p.reviewBtn} onPress={() => setShowReviewModal(true)}>
-              <Ionicons name="star-outline" size={14} color={C.accent} />
-              <Text style={p.reviewBtnText}>Write a review</Text>
-            </TouchableOpacity>
-          )}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {isOwner && (
+              <TouchableOpacity style={p.reviewBtn} onPress={() => setShowEditModal(true)}>
+                <Ionicons name="pencil-outline" size={14} color={C.accent} />
+                <Text style={p.reviewBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {canClaim && (
+              <TouchableOpacity style={[p.reviewBtn, { borderColor: C.success + '60', backgroundColor: C.success + '10' }]} onPress={handleClaim} disabled={claiming}>
+                <Ionicons name="flag-outline" size={14} color={C.success} />
+                <Text style={[p.reviewBtnText, { color: C.success }]}>{claiming ? 'Claiming…' : 'Claim venue'}</Text>
+              </TouchableOpacity>
+            )}
+            {user && !userReview && !isOwner && (
+              <TouchableOpacity style={p.reviewBtn} onPress={() => setShowReviewModal(true)}>
+                <Ionicons name="star-outline" size={14} color={C.accent} />
+                <Text style={p.reviewBtnText}>Write a review</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -149,6 +179,12 @@ export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }:
               </View>
               {venue.capacity && (
                 <Text style={p.heroCap}>Capacity: ~{venue.capacity.toLocaleString()}</Text>
+              )}
+              {isOwner && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <Ionicons name="shield-checkmark-outline" size={12} color={C.accent} />
+                  <Text style={{ fontSize: 11, color: C.accent, fontWeight: '600' }}>Your venue</Text>
+                </View>
               )}
             </View>
           </View>
@@ -345,6 +381,14 @@ export default function VenueProfileModal({ venue, onClose, onReviewSubmitted }:
           </View>
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {showEditModal && (
+          <EditVenueModal
+            venue={venue}
+            onClose={() => setShowEditModal(false)}
+            onSuccess={(updated) => { setVenue(updated); setShowEditModal(false); onReviewSubmitted(); }}
+          />
+        )}
 
         {showReviewModal && (
           <AddVenueReviewModal

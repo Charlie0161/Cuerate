@@ -11,6 +11,8 @@ import * as AuthSession from 'expo-auth-session';
 import { supabase, SOUNDCLOUD_CLIENT_ID, SOUNDCLOUD_REDIRECT_URI } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import PostBookingRequestModal from './PostBookingRequestModal';
+import VenueProfileModal from './VenueProfileModal';
+import { Venue } from './VenueDirectoryScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -48,6 +50,8 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [showPostGig, setShowPostGig] = useState(false);
   const [appsLoading, setAppsLoading] = useState(false);
   const [enablingVenue, setEnablingVenue] = useState(false);
+  const [myVenue, setMyVenue] = useState<Venue | null>(null);
+  const [showMyVenue, setShowMyVenue] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
@@ -63,7 +67,11 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   }, [user]);
 
   useEffect(() => {
-    if (profile?.is_venue && user) fetchVenueData();
+    if (profile?.is_venue && user) {
+      fetchVenueData();
+      supabase.from('venue_directory').select('*').eq('owner_id', user.id).maybeSingle()
+        .then(({ data }) => setMyVenue(data as Venue | null));
+    }
   }, [profile?.is_venue, user]);
 
   async function fetchVenueData() {
@@ -546,6 +554,28 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
 
         {activeTab === 'venue' && profile?.is_venue && (
           <View style={s.card}>
+            <Text style={s.cardTitle}>My Venue Listing</Text>
+            {myVenue ? (
+              <TouchableOpacity style={s.myVenueCard} onPress={() => setShowMyVenue(true)} activeOpacity={0.8}>
+                <View style={s.myVenueIcon}>
+                  <Ionicons name="business" size={22} color={C.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.myVenueName}>{myVenue.name}</Text>
+                  <Text style={s.myVenueCity}>{myVenue.city}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
+              </TouchableOpacity>
+            ) : (
+              <Text style={{ fontSize: 13, color: C.textMuted, lineHeight: 19, marginBottom: 4 }}>
+                No venue listing linked yet. Add your venue to the directory or claim an existing one.
+              </Text>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'venue' && profile?.is_venue && (
+          <View style={s.card}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={s.cardTitle}>Gig Slots</Text>
               <TouchableOpacity style={s.postGigBtn} onPress={() => setShowPostGig(true)}>
@@ -649,6 +679,16 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
           onSuccess={() => { setShowPostGig(false); fetchVenueData(); }}
         />
       )}
+      {showMyVenue && myVenue && (
+        <VenueProfileModal
+          venue={myVenue}
+          onClose={() => setShowMyVenue(false)}
+          onReviewSubmitted={() => {
+            supabase.from('venue_directory').select('*').eq('owner_id', user!.id).maybeSingle()
+              .then(({ data }) => setMyVenue(data as Venue | null));
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -701,6 +741,10 @@ const s = StyleSheet.create({
   toggleThumbOn: { backgroundColor: '#7C5CFC', alignSelf: 'flex-end' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.criticalBg, borderRadius: 10, borderWidth: 1, borderColor: C.critical + '40' },
   dangerBtnText: { fontSize: 15, color: C.critical, fontWeight: '600' },
+  myVenueCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.raised, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 4 },
+  myVenueIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: C.accentDim + '40', alignItems: 'center', justifyContent: 'center' },
+  myVenueName: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
+  myVenueCity: { fontSize: 12, color: C.textMuted },
   postGigBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: C.accentDim + '40', borderWidth: 1, borderColor: C.accentDim },
   postGigBtnText: { fontSize: 12, fontWeight: '600', color: C.accent },
   slotCard: { backgroundColor: C.raised, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 10 },
