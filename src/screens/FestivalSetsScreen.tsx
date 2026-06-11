@@ -24,6 +24,7 @@ interface FestivalSet {
   genre: string | null;
   mix_url: string | null;
   tracklist_url: string | null;
+  view_count: number;
   created_at: string;
 }
 
@@ -43,10 +44,23 @@ export default function FestivalSetsScreen() {
   const [showSubmit, setShowSubmit] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function toggleExpand(id: string) {
+    const opening = expanded !== id;
+    setExpanded(opening ? id : null);
+    if (opening) {
+      supabase.rpc('increment_set_views', { set_id: id });
+      const bump = (list: FestivalSet[]) =>
+        list.map(s => s.id === id ? { ...s, view_count: s.view_count + 1 } : s);
+      setRecent(bump);
+      setResults(bump);
+    }
+  }
+
   const loadRecent = useCallback(async () => {
     const { data } = await supabase
       .from('festival_sets')
       .select('*')
+      .order('view_count', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(50);
     setRecent((data as FestivalSet[]) ?? []);
@@ -95,7 +109,7 @@ export default function FestivalSetsScreen() {
       <TouchableOpacity
         key={set.id}
         style={s.setCard}
-        onPress={() => setExpanded(isExpanded ? null : set.id)}
+        onPress={() => toggleExpand(set.id)}
         activeOpacity={0.75}
       >
         <View style={s.setTop}>
@@ -116,6 +130,12 @@ export default function FestivalSetsScreen() {
             {set.genre && (
               <View style={s.genrePill}>
                 <Text style={s.genrePillText}>{set.genre}</Text>
+              </View>
+            )}
+            {set.view_count > 0 && (
+              <View style={s.viewCount}>
+                <Ionicons name="eye-outline" size={10} color={C.textMuted} />
+                <Text style={s.viewCountText}>{set.view_count}</Text>
               </View>
             )}
             <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={C.textMuted} />
@@ -169,7 +189,7 @@ export default function FestivalSetsScreen() {
     return (
       <TouchableOpacity
         style={s.recentCard}
-        onPress={() => setExpanded(isExpanded ? null : item.id)}
+        onPress={() => toggleExpand(item.id)}
         activeOpacity={0.75}
       >
         <View style={s.recentTop}>
@@ -184,6 +204,12 @@ export default function FestivalSetsScreen() {
             {item.genre && (
               <View style={s.genrePill}>
                 <Text style={s.genrePillText}>{item.genre}</Text>
+              </View>
+            )}
+            {item.view_count > 0 && (
+              <View style={s.viewCount}>
+                <Ionicons name="eye-outline" size={10} color={C.textMuted} />
+                <Text style={s.viewCountText}>{item.view_count}</Text>
               </View>
             )}
             <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={C.textMuted} />
@@ -274,7 +300,7 @@ export default function FestivalSetsScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
           ListHeaderComponent={
-            <Text style={s.sectionLabel}>Recently added</Text>
+            <Text style={s.sectionLabel}>Most popular</Text>
           }
           ListEmptyComponent={
             <View style={s.empty}>
@@ -334,4 +360,6 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 19 },
   emptyBtn: { marginTop: 8, backgroundColor: C.accentDim + '40', borderWidth: 1, borderColor: C.accentDim, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
   emptyBtnText: { fontSize: 14, fontWeight: '600', color: C.accent },
+  viewCount: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  viewCountText: { fontSize: 11, color: C.textMuted },
 });
