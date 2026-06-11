@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, Profile } from '../lib/supabase';
 
 interface AuthState {
@@ -70,10 +71,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ session, user: session?.user ?? null, initialized: true });
       if (session?.user) get().fetchProfile();
     });
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange(async (_event, session) => {
       set({ session, user: session?.user ?? null });
-      if (session?.user) get().fetchProfile();
-      else set({ profile: null });
+      if (session?.user) {
+        await get().fetchProfile();
+        // Apply role chosen during onboarding on first sign-in
+        const role = await AsyncStorage.getItem('onboard_role');
+        if (role) {
+          const { profile } = get();
+          const updates: Record<string, any> = {};
+          if (role === 'venue') { updates.account_type = 'venue'; updates.is_venue = true; }
+          else if (role === 'both') { updates.is_venue = true; }
+          // 'dj' is the default — no changes needed
+          if (Object.keys(updates).length > 0 && profile && !profile.is_venue) {
+            await get().updateProfile(updates);
+          }
+          await AsyncStorage.removeItem('onboard_role');
+        }
+      } else {
+        set({ profile: null });
+      }
     });
   },
 }));
