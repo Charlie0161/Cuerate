@@ -10,7 +10,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   GearListing, formatPrice, CONDITION_LABELS, CONDITION_COLORS,
 } from './MarketplaceScreen';
-import { GEAR_DATABASE } from '../data/gearDatabase';
+import { GEAR_DATABASE, getBuyLinks } from '../data/gearDatabase';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -36,7 +36,7 @@ export default function ListingDetailModal({ listing, onClose, onStatusChange }:
   const [photoIdx, setPhotoIdx] = useState(0);
   const [marking, setMarking] = useState(false);
   const isOwner = user?.id === listing.seller_id;
-  const buyUrl = GEAR_DATABASE.find(g => g.id === listing.gear_id)?.buyUrl;
+  const buyLinks = getBuyLinks(listing.brand, listing.model);
   const condCol = CONDITION_COLORS[listing.condition];
   const photos = listing.photo_urls ?? [];
 
@@ -197,13 +197,17 @@ export default function ListingDetailModal({ listing, onClose, onStatusChange }:
             )}
 
             {/* Buy new */}
-            {buyUrl && (
-              <TouchableOpacity style={l.buyNewBtn} onPress={() => Linking.openURL(buyUrl)}>
-                <Ionicons name="cart-outline" size={16} color={C.success} />
-                <Text style={l.buyNewBtnText}>Buy brand new</Text>
-                <Ionicons name="open-outline" size={13} color={C.textMuted} />
-              </TouchableOpacity>
-            )}
+            <View style={l.buyNewSection}>
+              <Text style={l.buyNewLabel}>Buy brand new</Text>
+              <View style={l.buyNewRow}>
+                {Object.entries(buyLinks).map(([retailer, url]) => (
+                  <TouchableOpacity key={retailer} style={l.buyNewBtn} onPress={() => Linking.openURL(url)}>
+                    <Text style={l.buyNewBtnText}>{retailer.charAt(0).toUpperCase() + retailer.slice(1)}</Text>
+                    <Ionicons name="open-outline" size={11} color={C.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             {/* Views */}
             <Text style={l.viewCount}>{listing.view_count} views</Text>
@@ -240,7 +244,10 @@ const l = StyleSheet.create({
   sellerLocation: { fontSize: 12, color: C.textMuted, marginTop: 2 },
   contactBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.accent, borderRadius: 14, paddingVertical: 16, marginBottom: 12 },
   contactBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  buyNewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: C.success + '50', borderRadius: 14, paddingVertical: 13, marginBottom: 16 },
-  buyNewBtnText: { fontSize: 14, fontWeight: '600', color: C.success },
+  buyNewSection: { marginBottom: 16 },
+  buyNewLabel: { fontSize: 11, fontWeight: '700', color: C.textSec, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  buyNewRow: { flexDirection: 'row', gap: 8 },
+  buyNewBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 11 },
+  buyNewBtnText: { fontSize: 13, fontWeight: '600', color: C.textSec },
   viewCount: { fontSize: 11, color: C.textMuted, textAlign: 'center' },
 });

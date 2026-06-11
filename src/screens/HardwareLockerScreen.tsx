@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRigStore, RigMode, GigProfile } from '../store/rigStore';
 import { useAuthStore } from '../store/authStore';
 import { generateAndShareRider, buildRiderDataFromGig, buildRiderDataFromHome } from '../utils/riderGenerator';
-import { GEAR_DATABASE, GearItem, ConnectionType, GearCategory, CompatibilityWarning } from '../data/gearDatabase';
+import { GEAR_DATABASE, GearItem, ConnectionType, GearCategory, CompatibilityWarning, getBuyLinks } from '../data/gearDatabase';
 
 // ─── Tokens ──────────────────────────────────────────────────────────────────
 const C = {
@@ -75,12 +75,13 @@ function GearChip({ gear, conn, onRemove, onChangeConn }: {
         {gear.category === 'laptop' && gear.os && (
           <Text style={s.chipMeta}>{gear.softwareCompatibility?.slice(0, 2).join(', ')}</Text>
         )}
-        {gear.buyUrl && (
-          <TouchableOpacity onPress={() => Linking.openURL(gear.buyUrl!)} style={s.buyLink}>
-            <Ionicons name="cart-outline" size={11} color={C.success} />
-            <Text style={s.buyLinkText}>Buy new</Text>
-          </TouchableOpacity>
-        )}
+        <View style={s.buyRow}>
+          {Object.entries(getBuyLinks(gear.brand, gear.model)).map(([retailer, url]) => (
+            <TouchableOpacity key={retailer} style={s.buyBtn} onPress={() => Linking.openURL(url)}>
+              <Text style={s.buyBtnText}>{retailer.charAt(0).toUpperCase() + retailer.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         {conn && (
           <TouchableOpacity onPress={() => setShowConn(true)} style={s.connBadge}>
             <Ionicons name="git-branch-outline" size={11} color={C.accent} />
@@ -586,8 +587,9 @@ const s = StyleSheet.create({
   chipBrand: { fontSize: 10, color: C.textMuted, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.6 },
   chipModel: { fontSize: 15, fontWeight: '600', color: C.text, marginTop: 1 },
   chipMeta: { fontSize: 11, color: C.textMuted, marginTop: 2 },
-  buyLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5, alignSelf: 'flex-start', backgroundColor: C.successBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
-  buyLinkText: { fontSize: 11, color: C.success, fontWeight: '600' },
+  buyRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  buyBtn: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 5, borderWidth: 1, borderColor: C.border },
+  buyBtnText: { fontSize: 11, color: C.textSec, fontWeight: '500' },
   connBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, alignSelf: 'flex-start', backgroundColor: C.accentDim + '30', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
   connBadgeText: { fontSize: 11, color: C.accent, fontWeight: '500' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
