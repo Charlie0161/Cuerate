@@ -9,11 +9,12 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { DJProfile } from './DJDirectoryScreen';
 import MessagesScreen from './MessagesScreen';
+import AddDJReviewModal from './AddDJReviewModal';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
   border: '#2A2A38', accent: '#7C5CFC', accentDim: '#3D2E8A',
-  success: '#4DCC8F', warning: '#F5A623',
+  success: '#4DCC8F', warning: '#F5A623', critical: '#FF4D4D',
   info: '#4DB8FF', soundcloud: '#FF5500',
   text: '#F0EFF8', textSec: '#8A89A0', textMuted: '#52516A',
 };
@@ -61,15 +62,20 @@ interface DJProfileModalProps {
 }
 
 export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const [mixes, setMixes]   = useState<Mix[]>([]);
   const [tracks, setTracks] = useState<TrackSubmission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab]       = useState<'mixes' | 'tracks'>('mixes');
+  const [tab, setTab]       = useState<'mixes' | 'tracks' | 'reviews'>('mixes');
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [userReview, setUserReview] = useState<any>(null);
+  const [avgRating, setAvgRating] = useState<number | null>(null);
 
   const initials = dj.dj_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const isOwnProfile = user?.id === dj.id;
@@ -110,6 +116,23 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
     setFollowLoading(false);
   }
 
+  async function fetchReviews() {
+    setReviewsLoading(true);
+    const { data } = await supabase
+      .from('dj_reviews')
+      .select('*, profiles:reviewer_id(dj_name, avatar_url)')
+      .eq('dj_id', dj.id)
+      .order('created_at', { ascending: false });
+    const list = data ?? [];
+    setReviews(list);
+    if (user) setUserReview(list.find((r: any) => r.reviewer_id === user.id) ?? null);
+    if (list.length > 0) {
+      const avg = list.reduce((sum: number, r: any) => sum + (r.overall_rating ?? 0), 0) / list.length;
+      setAvgRating(Math.round(avg * 10) / 10);
+    }
+    setReviewsLoading(false);
+  }
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -133,6 +156,7 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
       setLoading(false);
     }
     fetchData();
+    fetchReviews();
   }, [dj.id]);
 
   const timeAgo = (dateStr: string) => {
@@ -274,14 +298,16 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
 
           {/* Tabs */}
           <View style={p.tabRow}>
-            {(['mixes', 'tracks'] as const).map(t => (
+            {(['mixes', 'tracks', 'reviews'] as const).map(t => (
               <TouchableOpacity
                 key={t}
                 style={[p.tabBtn, tab === t && p.tabBtnActive]}
                 onPress={() => setTab(t)}
               >
                 <Text style={[p.tabText, tab === t && p.tabTextActive]}>
-                  {t === 'mixes' ? `Mixes (${mixes.length})` : `Tracks (${tracks.length})`}
+                  {t === 'mixes' ? `Mixes (${mixes.length})`
+                    : t === 'tracks' ? `Tracks (${tracks.length})`
+                    : `Reviews (${reviews.length})`}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -317,6 +343,83 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
                         <Ionicons name="play-circle-outline" size={22} color={C.textMuted} />
                       </TouchableOpacity>
                     ))
+                  )
+                )}
+
+                {/* Reviews tab */}
+                {tab === 'reviews' && (
+                  reviewsLoading ? (
+                    <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} />
+                  ) : (
+                    <View>
+                      {/* Overall rating summary */}
+                      {avgRating && (
+                        <View style={p.ratingsummary}>
+                          <Text style={p.ratingSummaryVal}>{avgRating}</Text>
+                          <View>
+                            <View style={{ flexDirection: 'row', gap: 2 }}>
+                              {[1,2,3,4,5].map(n => (
+                                <Ionicons key={n} name={n <= Math.round(avgRating) ? 'star' : 'star-outline'} size={14} color="#F0C040" />
+                              ))}
+                            </View>
+                            <Text style={p.ratingSummaryCount}>{reviews.length} review{reviews.length !== 1 ? 's' : ''}</Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Write review button — venue accounts only, not own profile */}
+                      {!isOwnProfile && user?.id && profile?.is_venue && !userReview && (
+                        <TouchableOpacity style={p.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
+                          <Ionicons name="star-outline" size={14} color={C.accent} />
+                          <Text style={p.writeReviewBtnText}>Write a review</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {reviews.length === 0 ? (
+                        <View style={p.emptyTab}>
+                          <Ionicons name="star-outline" size={32} color={C.textMuted} />
+                          <Text style={p.emptyTabText}>No reviews yet</Text>
+                        </View>
+                      ) : reviews.map((r: any) => (
+                        <View key={r.id} style={p.reviewCard}>
+                          <View style={p.reviewHeader}>
+                            <View style={p.reviewAvatar}>
+                              <Text style={p.reviewAvatarText}>
+                                {(r.profiles?.dj_name ?? 'V')[0].toUpperCase()}
+                              </Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={p.reviewerName}>{r.profiles?.dj_name ?? 'Venue'}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ flexDirection: 'row', gap: 1 }}>
+                                  {[1,2,3,4,5].map(n => (
+                                    <Ionicons key={n} name={n <= Math.round(r.overall_rating ?? 0) ? 'star' : 'star-outline'} size={11} color="#F0C040" />
+                                  ))}
+                                </View>
+                                {r.gig_date && <Text style={p.reviewMeta}>{r.gig_date}</Text>}
+                                <Text style={p.reviewMeta}>{timeAgo(r.created_at)}</Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                            {[
+                              { label: 'Pro',     val: r.rating_professionalism },
+                              { label: 'Comms',   val: r.rating_communication },
+                              { label: 'Music',   val: r.rating_music },
+                              { label: 'Punctual',val: r.rating_punctuality },
+                            ].filter(x => x.val).map(x => {
+                              const col = x.val >= 4 ? C.success : x.val >= 3 ? '#F5A623' : C.critical;
+                              return (
+                                <View key={x.label} style={[p.ratingChip, { backgroundColor: col + '18', borderColor: col + '40' }]}>
+                                  <Text style={[p.ratingChipText, { color: col }]}>{x.label} {x.val}/5</Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                          {r.review_text && <Text style={p.reviewText}>{r.review_text}</Text>}
+                        </View>
+                      ))}
+                    </View>
                   )
                 )}
 
@@ -357,6 +460,15 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
           </View>
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {showReviewModal && (
+          <AddDJReviewModal
+            djId={dj.id}
+            djName={dj.dj_name}
+            onClose={() => setShowReviewModal(false)}
+            onSuccess={() => { setShowReviewModal(false); fetchReviews(); }}
+          />
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -398,4 +510,18 @@ const p = StyleSheet.create({
   bpmText: { fontSize: 12, color: C.textSec },
   emptyTab: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   emptyTabText: { fontSize: 14, color: C.textMuted },
+  ratingsummary: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
+  ratingSummaryVal: { fontSize: 36, fontWeight: '800', color: '#F0C040' },
+  ratingSummaryCount: { fontSize: 12, color: C.textMuted, marginTop: 2 },
+  writeReviewBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: C.accentDim, backgroundColor: C.accentDim + '20', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
+  writeReviewBtnText: { fontSize: 13, fontWeight: '600', color: C.accent },
+  reviewCard: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  reviewAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.accentDim + '40', alignItems: 'center', justifyContent: 'center' },
+  reviewAvatarText: { fontSize: 13, fontWeight: '700', color: C.accent },
+  reviewerName: { fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 2 },
+  reviewMeta: { fontSize: 11, color: C.textMuted },
+  ratingChip: { borderRadius: 5, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
+  ratingChipText: { fontSize: 10, fontWeight: '700' },
+  reviewText: { fontSize: 13, color: C.textSec, lineHeight: 18, marginTop: 8 },
 });
