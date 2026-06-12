@@ -38,16 +38,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!user) return;
     set({ loading: true });
     try {
-      // Upsert ensures new users always get a profile row on first load
+      // Select first — avoids a write on every app open
       const { data, error } = await supabase
         .from('profiles')
-        .upsert(
-          { id: user.id, email: user.email ?? null, updated_at: new Date().toISOString() },
-          { onConflict: 'id', ignoreDuplicates: true }
-        )
-        .select()
+        .select('*')
+        .eq('id', user.id)
         .single();
-      if (!error && data) set({ profile: data });
+
+      if (!error && data) {
+        set({ profile: data });
+        return;
+      }
+
+      // Row missing (new user) — create it
+      if (error?.code === 'PGRST116') {
+        const { data: created } = await supabase
+          .from('profiles')
+          .upsert(
+            { id: user.id, email: user.email ?? null, updated_at: new Date().toISOString() },
+            { onConflict: 'id', ignoreDuplicates: true }
+          )
+          .select()
+          .single();
+        if (created) set({ profile: created });
+      }
     } finally {
       set({ loading: false });
     }

@@ -20,12 +20,14 @@ export async function registerPushToken(userId: string) {
     }
     if (finalStatus !== 'granted') return;
 
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    // Race against a 5s timeout — getExpoPushTokenAsync can hang in Expo Go
+    const tokenResult = await Promise.race([
+      Notifications.getExpoPushTokenAsync(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+    ]);
+    if (!tokenResult) return;
 
-    await supabase
-      .from('profiles')
-      .update({ push_token: token })
-      .eq('id', userId);
+    const token = tokenResult.data;
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
@@ -33,6 +35,9 @@ export async function registerPushToken(userId: string) {
         importance: Notifications.AndroidImportance.MAX,
       });
     }
+
+    // Fire-and-forget — don't block anything on this write
+    supabase.from('profiles').update({ push_token: token }).eq('id', userId);
   } catch {}
 }
 
