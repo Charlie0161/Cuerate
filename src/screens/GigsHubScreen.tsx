@@ -91,6 +91,8 @@ const s = StyleSheet.create({
     backgroundColor: C.surface,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
+    flexGrow: 0,
+    flexShrink: 0,
   },
   tabBarContent: {
     flexDirection: 'row',
