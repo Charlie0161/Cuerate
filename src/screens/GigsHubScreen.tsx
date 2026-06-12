@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import GigsScreen from './GigsScreen';
 import GigCalendarScreen from './GigCalendarScreen';
@@ -37,7 +37,7 @@ export default function GigsHubScreen() {
   if (isVenue) {
     return (
       <View style={s.root}>
-        <View style={s.tabBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar} contentContainerStyle={s.tabBarContent}>
           {VENUE_TABS.map(t => (
             <TouchableOpacity
               key={t.id}
@@ -50,7 +50,7 @@ export default function GigsHubScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
         <View style={{ flex: 1 }}>
           {venueTab === 'my-gigs' && <VenueGigsScreen />}
           {venueTab === 'browse' && <GigsScreen />}
@@ -61,7 +61,7 @@ export default function GigsHubScreen() {
 
   return (
     <View style={s.root}>
-      <View style={s.tabBar}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar} contentContainerStyle={s.tabBarContent}>
         {DJ_TABS.map(t => (
           <TouchableOpacity
             key={t.id}
@@ -74,7 +74,7 @@ export default function GigsHubScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
       <View style={{ flex: 1 }}>
         {djTab === 'browse' && <GigsScreen />}
         {djTab === 'calendar' && <GigCalendarScreen />}
@@ -88,10 +88,12 @@ export default function GigsHubScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: C.surface,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
+  },
+  tabBarContent: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 4,
   },
