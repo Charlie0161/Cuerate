@@ -615,38 +615,76 @@ function SoundCloudSyncBanner({ userId, username }: { userId: string; username: 
     setSyncing(true);
     setResult(null);
     try {
-      const resolveRes = await fetch(
-        `https://api.soundcloud.com/resolve?url=https://soundcloud.com/${username}&client_id=W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M`
-      );
-      if (!resolveRes.ok) throw new Error();
-      const scUser = await resolveRes.json();
-      const plRes = await fetch(
-        `https://api.soundcloud.com/users/${scUser.id}/playlists?client_id=W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M&limit=50`
-      );
-      if (!plRes.ok) throw new Error();
-      const playlists = await plRes.json();
-      const rows = (playlists as any[])
-        .filter(p => p.permalink_url && p.title)
+      const CLIENT_ID = 'W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M';
+
+      // Try v2 API first, fall back to v1
+      let scUserId: string | null = null;
+      for (const base of ['https://api-v2.soundcloud.com', 'https://api.soundcloud.com']) {
+        const res = await fetch(`${base}/resolve?url=https://soundcloud.com/${username}&client_id=${CLIENT_ID}`);
+        if (res.ok) {
+          const json = await res.json();
+          scUserId = json.id ? String(json.id) : null;
+          if (scUserId) break;
+        }
+      }
+
+      if (!scUserId) {
+        setResult(`Could not find SoundCloud user "@${username}". Make sure your username is correct in your profile.`);
+        return;
+      }
+
+      // Fetch both playlists (sets) and individual tracks in parallel
+      const [plRes, trRes] = await Promise.all([
+        fetch(`https://api-v2.soundcloud.com/users/${scUserId}/playlists?client_id=${CLIENT_ID}&limit=50`),
+        fetch(`https://api-v2.soundcloud.com/users/${scUserId}/tracks?client_id=${CLIENT_ID}&limit=50`),
+      ]);
+
+      const playlists: any[] = plRes.ok ? ((await plRes.json()).collection ?? []) : [];
+      const tracks: any[] = trRes.ok ? ((await trRes.json()).collection ?? []) : [];
+
+      const setRows = playlists
+        .filter(p => p.permalink_url && p.title && p.sharing === 'public')
         .map(p => ({
           user_id: userId,
           title: p.title,
           description: p.description ?? null,
-          type: 'set',
+          type: 'set' as const,
           platform: 'soundcloud',
           external_url: p.permalink_url,
           thumbnail_url: p.artwork_url ? p.artwork_url.replace('-large', '-t300x300') : null,
           genre: p.genre ?? null,
         }));
-      if (rows.length === 0) { setResult('No public sets found on your SoundCloud.'); return; }
+
+      const trackRows = tracks
+        .filter(t => t.permalink_url && t.title && t.sharing === 'public')
+        .map(t => ({
+          user_id: userId,
+          title: t.title,
+          description: t.description ?? null,
+          type: 'track' as const,
+          platform: 'soundcloud',
+          external_url: t.permalink_url,
+          thumbnail_url: t.artwork_url ? t.artwork_url.replace('-large', '-t300x300') : null,
+          genre: t.genre ?? null,
+        }));
+
+      const rows = [...setRows, ...trackRows];
+
+      if (rows.length === 0) {
+        setResult('No public tracks or sets found. Check your SoundCloud privacy settings.');
+        return;
+      }
+
       const { data } = await supabase
         .from('mixes')
         .upsert(rows, { onConflict: 'user_id,external_url', ignoreDuplicates: true })
         .select('id');
+
       const added = data?.length ?? 0;
-      setResult(`${added} set${added !== 1 ? 's' : ''} imported!`);
-      setHasImported(true);
-    } catch {
-      setResult('Sync failed — check your connection.');
+      setResult(`${added} item${added !== 1 ? 's' : ''} imported!`);
+      if (added > 0) setHasImported(true);
+    } catch (e) {
+      setResult('Sync failed — check your connection and try again.');
     } finally {
       setSyncing(false);
     }

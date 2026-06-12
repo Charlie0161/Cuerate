@@ -182,18 +182,24 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
         const json = await res.json();
         playlists = json.collection ?? json ?? [];
       } else if (opts.username) {
-        // Public path — resolve username → user id → playlists
-        const resolveRes = await fetch(
-          `https://api.soundcloud.com/resolve?url=https://soundcloud.com/${opts.username}&client_id=${SOUNDCLOUD_CLIENT_ID}`
-        );
-        if (resolveRes.ok) {
-          const scUser = await resolveRes.json();
-          if (scUser.id) {
-            const plRes = await fetch(
-              `https://api.soundcloud.com/users/${scUser.id}/playlists?client_id=${SOUNDCLOUD_CLIENT_ID}&limit=50`
-            );
-            if (plRes.ok) playlists = await plRes.json();
+        // Public path — try v2 then v1 resolve
+        let scUserId: string | null = null;
+        for (const base of ['https://api-v2.soundcloud.com', 'https://api.soundcloud.com']) {
+          const res = await fetch(`${base}/resolve?url=https://soundcloud.com/${opts.username}&client_id=${SOUNDCLOUD_CLIENT_ID}`);
+          if (res.ok) {
+            const json = await res.json();
+            scUserId = json.id ? String(json.id) : null;
+            if (scUserId) break;
           }
+        }
+        if (scUserId) {
+          const [plRes, trRes] = await Promise.all([
+            fetch(`https://api-v2.soundcloud.com/users/${scUserId}/playlists?client_id=${SOUNDCLOUD_CLIENT_ID}&limit=50`),
+            fetch(`https://api-v2.soundcloud.com/users/${scUserId}/tracks?client_id=${SOUNDCLOUD_CLIENT_ID}&limit=50`),
+          ]);
+          const pl = plRes.ok ? ((await plRes.json()).collection ?? []) : [];
+          const tr = trRes.ok ? ((await trRes.json()).collection ?? []) : [];
+          playlists = [...pl, ...tr];
         }
       }
 
@@ -203,12 +209,12 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
       }
 
       const rows = playlists
-        .filter((p: any) => p.permalink_url && p.title)
+        .filter((p: any) => p.permalink_url && p.title && p.sharing === 'public')
         .map((p: any) => ({
           user_id: user.id,
           title: p.title,
           description: p.description ?? null,
-          type: 'set',
+          type: (p.kind === 'playlist' ? 'set' : 'track') as 'set' | 'track',
           platform: 'soundcloud',
           external_url: p.permalink_url,
           thumbnail_url: p.artwork_url
