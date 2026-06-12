@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -41,6 +41,7 @@ export default function PostMixModal({ onClose, onSuccess }: Props) {
   const [fetching, setFetching] = useState(false);
   const [fetched, setFetched] = useState<{ title: string; thumbnail: string | null } | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -51,30 +52,40 @@ export default function PostMixModal({ onClose, onSuccess }: Props) {
 
   const platform = detectPlatform(url.trim());
 
-  async function fetchMeta() {
+  // Auto-fetch when URL looks complete
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     const trimmed = url.trim();
-    if (!trimmed) return;
+    const looksValid = Object.keys(OEMBED).some(p => trimmed.includes(p + '.com')) || trimmed.includes('youtu.be');
+    if (!looksValid) { setFetched(null); setFetchError(null); return; }
+    debounceRef.current = setTimeout(() => fetchMeta(trimmed), 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [url]);
+
+  async function fetchMeta(trimmed: string) {
     setFetching(true);
     setFetchError(null);
     setFetched(null);
     try {
-      const oembedBase = OEMBED[platform];
+      const p = detectPlatform(trimmed);
+      const oembedBase = OEMBED[p];
       if (oembedBase) {
         const res = await fetch(`${oembedBase}${encodeURIComponent(trimmed)}`);
         if (res.ok) {
           const data = await res.json();
-          const meta = { title: data.title ?? '', thumbnail: data.thumbnail_url ?? null };
-          setFetched(meta);
-          setTitle(meta.title);
+          setFetched({ title: data.title ?? '', thumbnail: data.thumbnail_url ?? null });
+          setTitle(data.title ?? '');
+          // Auto-detect set vs track from URL
+          if (p === 'soundcloud' && trimmed.includes('/sets/')) setType('set');
+          else if (p === 'soundcloud') setType('track');
           return;
         }
       }
-      // No oEmbed available — let user fill in manually
       setFetched({ title: '', thumbnail: null });
-      setFetchError('Could not auto-fetch details — fill in the title below.');
+      setFetchError('Could not fetch details — fill in the title below.');
     } catch {
       setFetched({ title: '', thumbnail: null });
-      setFetchError('Could not reach that URL — fill in the title below.');
+      setFetchError('Could not reach that URL — check the link.');
     } finally {
       setFetching(false);
     }
@@ -133,23 +144,23 @@ export default function PostMixModal({ onClose, onSuccess }: Props) {
               <TextInput
                 style={[s.input, s.urlInput]}
                 value={url}
-                onChangeText={t => { setUrl(t); setFetched(null); setFetchError(null); }}
+                onChangeText={setUrl}
                 placeholder="soundcloud.com/... mixcloud.com/... youtu.be/..."
                 placeholderTextColor={C.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={fetchMeta}
+                autoFocus
               />
-              <TouchableOpacity
-                style={[s.fetchBtn, fetching && { opacity: 0.6 }]}
-                onPress={fetchMeta}
-                disabled={fetching || !url.trim()}
-              >
-                {fetching
-                  ? <ActivityIndicator size="small" color={C.accent} />
-                  : <Text style={s.fetchBtnText}>Fetch</Text>}
-              </TouchableOpacity>
+              {fetching && (
+                <View style={s.urlSpinner}>
+                  <ActivityIndicator size="small" color={C.accent} />
+                </View>
+              )}
+              {fetched && !fetching && (
+                <View style={s.urlSpinner}>
+                  <Ionicons name="checkmark-circle" size={20} color={C.success} />
+                </View>
+              )}
             </View>
 
             {/* Platform badge */}
@@ -249,12 +260,11 @@ const s = StyleSheet.create({
   postBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   body: { padding: 16, gap: 4, paddingBottom: 60 },
   label: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 6 },
-  urlRow: { flexDirection: 'row', gap: 8 },
+  urlRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: { backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: C.text },
   urlInput: { flex: 1 },
+  urlSpinner: { width: 32, alignItems: 'center' },
   textarea: { height: 90, textAlignVertical: 'top', paddingTop: 12 },
-  fetchBtn: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: C.accentDim, backgroundColor: C.accentDim + '30' },
-  fetchBtnText: { fontSize: 14, fontWeight: '600', color: C.accent },
   platformRow: { marginTop: 6 },
   platformBadge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 3 },
   platformText: { fontSize: 12, fontWeight: '600' },
