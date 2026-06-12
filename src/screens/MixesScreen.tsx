@@ -593,6 +593,92 @@ function ForYouFeed({ userId, userGenre, session }: { userId: string; userGenre:
   );
 }
 
+// ─── SoundCloud Sync Banner ──────────────────────────────────────────────────
+function SoundCloudSyncBanner({ userId, username }: { userId: string; username: string }) {
+  const [hasImported, setHasImported] = useState<boolean | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('mixes')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('platform', 'soundcloud')
+      .limit(1)
+      .then(({ data }) => setHasImported((data?.length ?? 0) > 0));
+  }, [userId]);
+
+  if (hasImported !== false) return null; // hide once imported or still loading
+
+  async function sync() {
+    setSyncing(true);
+    setResult(null);
+    try {
+      const resolveRes = await fetch(
+        `https://api.soundcloud.com/resolve?url=https://soundcloud.com/${username}&client_id=W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M`
+      );
+      if (!resolveRes.ok) throw new Error();
+      const scUser = await resolveRes.json();
+      const plRes = await fetch(
+        `https://api.soundcloud.com/users/${scUser.id}/playlists?client_id=W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M&limit=50`
+      );
+      if (!plRes.ok) throw new Error();
+      const playlists = await plRes.json();
+      const rows = (playlists as any[])
+        .filter(p => p.permalink_url && p.title)
+        .map(p => ({
+          user_id: userId,
+          title: p.title,
+          description: p.description ?? null,
+          type: 'set',
+          platform: 'soundcloud',
+          external_url: p.permalink_url,
+          thumbnail_url: p.artwork_url ? p.artwork_url.replace('-large', '-t300x300') : null,
+          genre: p.genre ?? null,
+        }));
+      if (rows.length === 0) { setResult('No public sets found on your SoundCloud.'); return; }
+      const { data } = await supabase
+        .from('mixes')
+        .upsert(rows, { onConflict: 'user_id,external_url', ignoreDuplicates: true })
+        .select('id');
+      const added = data?.length ?? 0;
+      setResult(`${added} set${added !== 1 ? 's' : ''} imported!`);
+      setHasImported(true);
+    } catch {
+      setResult('Sync failed — check your connection.');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <View style={scb.banner}>
+      <View style={scb.iconWrap}>
+        <Ionicons name="musical-note" size={16} color="#FF5500" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={scb.title}>Import your SoundCloud sets</Text>
+        <Text style={scb.sub}>{result ?? `Tap to import your public sets from @${username}`}</Text>
+      </View>
+      <TouchableOpacity style={[scb.btn, syncing && { opacity: 0.6 }]} onPress={sync} disabled={syncing}>
+        {syncing
+          ? <ActivityIndicator size="small" color="#FF5500" />
+          : <Text style={scb.btnText}>Import</Text>}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const scb = StyleSheet.create({
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, backgroundColor: '#1A0E00', borderRadius: 12, borderWidth: 1, borderColor: '#FF550040', padding: 12 },
+  iconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FF550020', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 13, fontWeight: '700', color: C.text },
+  sub: { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  btn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FF5500' },
+  btnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+});
+
 // ─── Gig Countdown Banner ─────────────────────────────────────────────────────
 function GigCountdownBanner({ userId }: { userId: string }) {
   const [nextGig, setNextGig] = useState<{ venue_name: string; date: string; start_time: string | null } | null>(null);
@@ -750,6 +836,11 @@ export default function MixesScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* SoundCloud import nudge */}
+      {user && profile?.soundcloud_username && feedMode !== 'following' && (
+        <SoundCloudSyncBanner userId={user.id} username={profile.soundcloud_username} />
+      )}
 
       {/* Gig countdown */}
       {user && <GigCountdownBanner userId={user.id} />}
