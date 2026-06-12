@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { MixCardSkeleton, DJCardSkeleton } from '../components/SkeletonCard';
+import PostMixModal from './PostMixModal';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -771,6 +772,7 @@ export default function MixesScreen() {
   const [genre, setGenre] = useState('All');
   const [search, setSearch] = useState('');
   const [feedMode, setFeedMode] = useState<'all' | 'forYou' | 'following'>('all');
+  const [showPostModal, setShowPostModal] = useState(false);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -987,6 +989,22 @@ export default function MixesScreen() {
           )}
         />
       ))}
+      {/* FAB — share a mix */}
+      {session && (
+        <TouchableOpacity style={s.fab} onPress={() => setShowPostModal(true)}>
+          <Ionicons name="add" size={26} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {showPostModal && (
+        <PostMixModal
+          onClose={() => setShowPostModal(false)}
+          onSuccess={() => {
+            setShowPostModal(false);
+            fetchMixes();
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1014,6 +1032,7 @@ const s = StyleSheet.create({
   feedTabActive: { backgroundColor: C.accent },
   feedTabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
   feedTabTextActive: { color: '#fff' },
+  fab: { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text, marginTop: 14, marginBottom: 6 },
   emptyBody: { fontSize: 14, color: C.textSec, textAlign: 'center', lineHeight: 21 },
