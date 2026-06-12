@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { containsProfanity } from '../lib/profanity';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -94,6 +95,7 @@ export default function PostMixModal({ onClose, onSuccess }: Props) {
   async function submit() {
     if (!url.trim()) { setError('Paste a link first.'); return; }
     if (!title.trim()) { setError('Title is required.'); return; }
+    if (containsProfanity(title) || containsProfanity(description)) { setError('Your text contains language that isn\'t allowed.'); return; }
     if (!user) return;
     setSubmitting(true);
     setError(null);

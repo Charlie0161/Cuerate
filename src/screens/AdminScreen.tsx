@@ -52,13 +52,17 @@ interface Props {
 }
 
 export default function AdminScreen({ onClose }: Props) {
-  const [panel, setPanel] = useState<'claims' | 'feedback' | 'reports'>('claims');
+  const [panel, setPanel] = useState<'claims' | 'feedback' | 'reports' | 'users'>('claims');
 
   // Claims state
   const [claims, setClaims] = useState<Claim[]>([]);
   const [claimsLoading, setClaimsLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Users state
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   // Reports state
   const [reports, setReports] = useState<any[]>([]);
@@ -142,9 +146,37 @@ export default function AdminScreen({ onClose }: Props) {
     setReportsLoading(false);
   }, []);
 
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, dj_name, email, account_type, created_at, is_admin')
+      .order('created_at', { ascending: false });
+    setUsers(data ?? []);
+    setUsersLoading(false);
+  }, []);
+
+  async function handleDeleteUser(user: any) {
+    Alert.alert(
+      'Delete user',
+      `Permanently delete ${user.dj_name ?? user.email}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            // Delete profile — cascade handles related data
+            await supabase.from('profiles').delete().eq('id', user.id);
+            setUsers(prev => prev.filter(u => u.id !== user.id));
+          },
+        },
+      ]
+    );
+  }
+
   useEffect(() => { if (panel === 'claims') loadClaims(); }, [loadClaims, panel]);
   useEffect(() => { if (panel === 'feedback') loadFeedback(); }, [loadFeedback, panel]);
   useEffect(() => { if (panel === 'reports') loadReports(); }, [loadReports, panel]);
+  useEffect(() => { if (panel === 'users') loadUsers(); }, [loadUsers, panel]);
 
   async function handleApprove(claim: Claim) {
     Alert.alert(
@@ -214,6 +246,10 @@ export default function AdminScreen({ onClose }: Props) {
           <Ionicons name="flag-outline" size={15} color={panel === 'reports' ? C.critical : C.textMuted} />
           <Text style={[s.panelTabText, panel === 'reports' && { color: C.critical }]}>Reports</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={[s.panelTab, panel === 'users' && s.panelTabActive]} onPress={() => setPanel('users')}>
+          <Ionicons name="people-outline" size={15} color={panel === 'users' ? C.accent : C.textMuted} />
+          <Text style={[s.panelTabText, panel === 'users' && s.panelTabTextActive]}>Users</Text>
+        </TouchableOpacity>
       </View>
 
       {panel === 'reports' && (
@@ -253,6 +289,44 @@ export default function AdminScreen({ onClose }: Props) {
                     </View>
                   )}
                 </View>
+              </View>
+            )}
+          />
+        )
+      )}
+
+      {panel === 'users' && (
+        usersLoading ? (
+          <ActivityIndicator size="large" color={C.accent} style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={users}
+            keyExtractor={u => u.id}
+            contentContainerStyle={{ padding: 16, gap: 10 }}
+            ListHeaderComponent={
+              <Text style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>{users.length} accounts</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={s.cardHeader}>
+                  <View style={[s.venueIcon, { backgroundColor: item.is_admin ? C.gold + '20' : C.accentDim + '30' }]}>
+                    <Ionicons name={item.is_admin ? 'star' : 'person-outline'} size={16} color={item.is_admin ? C.gold : C.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.venueName}>{item.dj_name ?? 'No name set'}</Text>
+                    <Text style={s.venueCity}>{item.email ?? item.id.slice(0, 8)} · {item.account_type ?? 'dj'}</Text>
+                  </View>
+                  <Text style={s.timeAgo}>{timeAgo(item.created_at)}</Text>
+                </View>
+                {!item.is_admin && (
+                  <TouchableOpacity
+                    style={s.rejectBtn}
+                    onPress={() => handleDeleteUser(item)}
+                  >
+                    <Ionicons name="trash-outline" size={14} color={C.critical} />
+                    <Text style={s.rejectBtnText}>Delete account</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           />

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { sendPushNotification } from '../lib/notifications';
+import { containsProfanity } from '../lib/profanity';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -53,6 +54,7 @@ export default function ApplyForGigModal({ request, onClose, onSuccess }: Props)
   async function handleApply() {
     if (!user) return;
     if (!message.trim()) { Alert.alert('Message required', 'Tell the venue a bit about yourself.'); return; }
+    if (containsProfanity(message)) { Alert.alert('Hold on', 'Your message contains language that isn\'t allowed. Please keep it professional.'); return; }
     setLoading(true);
     const { error } = await supabase.from('booking_applications').insert({
       request_id: request.id,

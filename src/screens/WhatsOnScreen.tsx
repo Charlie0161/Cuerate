@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { containsProfanity } from '../lib/profanity';
 
 const TICKETMASTER_KEY = 'AozPym31hIsQKtnXvBNMqGjRXbUR8tUE';
 // ─── Get your free key at skiddle.com/api ────────────────────────────────────
@@ -79,6 +80,7 @@ function PostEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
 
   async function submit() {
     if (!title.trim()) { setError('Event title is required.'); return; }
+    if (containsProfanity(title) || containsProfanity(description)) { setError('Your text contains language that isn\'t allowed.'); return; }
     if (!venueName.trim()) { setError('Venue name is required.'); return; }
     if (!location.trim()) { setError('Location is required (city, country).'); return; }
     if (!date.trim()) { setError('Date is required (YYYY-MM-DD).'); return; }
