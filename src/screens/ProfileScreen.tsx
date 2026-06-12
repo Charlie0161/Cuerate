@@ -37,6 +37,8 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [scLoading, setScLoading] = useState(false);
+  const [scSyncing, setScSyncing] = useState(false);
+  const [scSyncResult, setScSyncResult] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
   // Fallback: manual SoundCloud URL input
   const [showScManual, setShowScManual] = useState(false);
@@ -165,6 +167,73 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  async function syncSoundCloudSets(opts: { accessToken?: string; username?: string }) {
+    if (!user) return 0;
+    setScSyncing(true);
+    setScSyncResult(null);
+    try {
+      let playlists: any[] = [];
+
+      if (opts.accessToken) {
+        // OAuth path — fetch user's own playlists
+        const res = await fetch('https://api.soundcloud.com/me/playlists?limit=50&linked_partitioning=1', {
+          headers: { Authorization: `OAuth ${opts.accessToken}` },
+        });
+        const json = await res.json();
+        playlists = json.collection ?? json ?? [];
+      } else if (opts.username) {
+        // Public path — resolve username → user id → playlists
+        const resolveRes = await fetch(
+          `https://api.soundcloud.com/resolve?url=https://soundcloud.com/${opts.username}&client_id=${SOUNDCLOUD_CLIENT_ID}`
+        );
+        if (resolveRes.ok) {
+          const scUser = await resolveRes.json();
+          if (scUser.id) {
+            const plRes = await fetch(
+              `https://api.soundcloud.com/users/${scUser.id}/playlists?client_id=${SOUNDCLOUD_CLIENT_ID}&limit=50`
+            );
+            if (plRes.ok) playlists = await plRes.json();
+          }
+        }
+      }
+
+      if (playlists.length === 0) {
+        setScSyncResult('No public sets found on SoundCloud.');
+        return 0;
+      }
+
+      const rows = playlists
+        .filter((p: any) => p.permalink_url && p.title)
+        .map((p: any) => ({
+          user_id: user.id,
+          title: p.title,
+          description: p.description ?? null,
+          type: 'set',
+          platform: 'soundcloud',
+          external_url: p.permalink_url,
+          thumbnail_url: p.artwork_url
+            ? p.artwork_url.replace('-large', '-t300x300')
+            : null,
+          genre: p.genre ?? null,
+        }));
+
+      // Upsert — skip rows that already exist for this user + URL
+      const { data, error } = await supabase
+        .from('mixes')
+        .upsert(rows, { onConflict: 'user_id,external_url', ignoreDuplicates: true })
+        .select('id');
+
+      const added = data?.length ?? 0;
+      setScSyncResult(added > 0 ? `${added} set${added !== 1 ? 's' : ''} imported!` : 'All sets already imported.');
+      return added;
+    } catch {
+      setScSyncResult('Sync failed — check your connection.');
+      return 0;
+    } finally {
+      setScSyncing(false);
+    }
+  }
+
   async function connectSoundCloud() {
     setScLoading(true);
     try {
@@ -215,6 +284,8 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
                 avatar_url: scProfile.avatar_url.replace('-large', '-t300x300'),
               });
             }
+            // Auto-import sets in background — don't block UI
+            syncSoundCloudSets({ accessToken: tokenData.access_token });
           } else {
             // Token exchange failed — fall back to manual
             setShowScManual(true);
@@ -243,6 +314,7 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
       soundcloud_username: username,
     });
     setShowScManual(false);
+    syncSoundCloudSets({ username });
   }
 
   async function disconnectSoundCloud() {
@@ -519,17 +591,32 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
 
           {profile?.soundcloud_username ? (
             // Connected state
-            <View style={s.connectedService}>
-              <View style={[s.serviceIcon, { backgroundColor: C.soundcloudBg }]}>
-                <Ionicons name="musical-note" size={20} color={C.soundcloud} />
+            <View style={{ gap: 10 }}>
+              <View style={s.connectedService}>
+                <View style={[s.serviceIcon, { backgroundColor: C.soundcloudBg }]}>
+                  <Ionicons name="musical-note" size={20} color={C.soundcloud} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.serviceConnectedLabel}>SoundCloud connected</Text>
+                  <Text style={s.serviceUsername}>@{profile.soundcloud_username}</Text>
+                </View>
+                <TouchableOpacity onPress={disconnectSoundCloud} style={s.disconnectBtn}>
+                  <Text style={s.disconnectText}>Disconnect</Text>
+                </TouchableOpacity>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.serviceConnectedLabel}>SoundCloud connected</Text>
-                <Text style={s.serviceUsername}>@{profile.soundcloud_username}</Text>
-              </View>
-              <TouchableOpacity onPress={disconnectSoundCloud} style={s.disconnectBtn}>
-                <Text style={s.disconnectText}>Disconnect</Text>
+              <TouchableOpacity
+                style={[s.syncBtn, scSyncing && { opacity: 0.6 }]}
+                onPress={() => syncSoundCloudSets({ username: profile!.soundcloud_username! })}
+                disabled={scSyncing}
+              >
+                {scSyncing
+                  ? <ActivityIndicator size="small" color={C.soundcloud} />
+                  : <Ionicons name="sync-outline" size={15} color={C.soundcloud} />}
+                <Text style={s.syncBtnText}>{scSyncing ? 'Importing sets…' : 'Sync sets from SoundCloud'}</Text>
               </TouchableOpacity>
+              {scSyncResult && (
+                <Text style={s.syncResult}>{scSyncResult}</Text>
+              )}
             </View>
           ) : showScManual ? (
             // Manual URL fallback
@@ -874,6 +961,9 @@ const s = StyleSheet.create({
   serviceUsername: { fontSize: 15, color: C.text, fontWeight: '600' },
   disconnectBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: C.critical + '50' },
   disconnectText: { fontSize: 12, color: C.critical, fontWeight: '600' },
+  syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: C.soundcloud + '40', backgroundColor: C.soundcloudBg },
+  syncBtnText: { fontSize: 13, fontWeight: '600', color: C.soundcloud },
+  syncResult: { fontSize: 12, color: C.textSec, textAlign: 'center' },
   serviceBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   serviceBtnText: { fontSize: 15, fontWeight: '600' },
   serviceBtnSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
