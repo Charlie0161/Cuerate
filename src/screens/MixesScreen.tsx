@@ -499,6 +499,121 @@ function SuggestedDJs({ currentUserId, onFollowed }: { currentUserId: string; on
   );
 }
 
+// ─── For You Strip ───────────────────────────────────────────────────────────
+type ForYouMix = {
+  id: string;
+  title: string;
+  dj_name: string | null;
+  genre: string | null;
+  platform: string;
+  external_url: string;
+  like_count: number;
+};
+
+function ForYouStrip({ userId, userGenre }: { userId: string; userGenre: string | null }) {
+  const [picks, setPicks] = useState<ForYouMix[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      // Fetch liked mix IDs so we can exclude them
+      const { data: likedData } = await supabase
+        .from('likes')
+        .select('mix_id')
+        .eq('user_id', userId);
+      const likedIds = new Set((likedData ?? []).map((l: any) => l.mix_id));
+
+      // Genre-matched query, fallback to all if no genre
+      let q = supabase
+        .from('mix_feed')
+        .select('id, title, dj_name, genre, platform, external_url, like_count')
+        .eq('type', 'set')
+        .order('like_count', { ascending: false })
+        .limit(30);
+
+      if (userGenre) q = q.ilike('genre', `%${userGenre.split(' ')[0]}%`);
+
+      const { data } = await q;
+      const filtered = (data ?? [])
+        .filter((m: any) => !likedIds.has(m.id))
+        .slice(0, 10) as ForYouMix[];
+
+      // If genre match returns < 3, broaden to top mixes overall
+      if (filtered.length < 3) {
+        const { data: popular } = await supabase
+          .from('mix_feed')
+          .select('id, title, dj_name, genre, platform, external_url, like_count')
+          .eq('type', 'set')
+          .order('like_count', { ascending: false })
+          .limit(20);
+        const broad = (popular ?? [])
+          .filter((m: any) => !likedIds.has(m.id))
+          .slice(0, 10) as ForYouMix[];
+        setPicks(broad);
+      } else {
+        setPicks(filtered);
+      }
+      setLoading(false);
+    }
+    load();
+  }, [userId, userGenre]);
+
+  if (loading || picks.length === 0) return null;
+
+  return (
+    <View style={fy.wrap}>
+      <View style={fy.header}>
+        <Ionicons name="sparkles" size={13} color={C.accent} />
+        <Text style={fy.heading}>Recommended for you</Text>
+        {userGenre && <Text style={fy.genreTag}>{userGenre}</Text>}
+      </View>
+      <FlatList
+        data={picks}
+        keyExtractor={m => m.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+        renderItem={({ item }) => {
+          const col = PLATFORM_COLORS[item.platform] ?? C.textMuted;
+          return (
+            <TouchableOpacity
+              style={fy.card}
+              onPress={() => Linking.openURL(item.external_url)}
+              activeOpacity={0.75}
+            >
+              <View style={[fy.platformDot, { backgroundColor: col }]} />
+              <Text style={fy.cardTitle} numberOfLines={2}>{item.title}</Text>
+              <Text style={fy.cardDj} numberOfLines={1}>{item.dj_name ?? 'DJ'}</Text>
+              <View style={fy.cardFooter}>
+                {item.genre && <Text style={fy.cardGenre}>{item.genre}</Text>}
+                <View style={fy.likeRow}>
+                  <Ionicons name="heart" size={10} color={C.critical} />
+                  <Text style={fy.likeCount}>{item.like_count}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+      />
+    </View>
+  );
+}
+
+const fy = StyleSheet.create({
+  wrap: { marginBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 10 },
+  heading: { fontSize: 13, fontWeight: '700', color: C.text, flex: 1 },
+  genreTag: { fontSize: 11, fontWeight: '600', color: C.accent, backgroundColor: C.accentDim + '30', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: C.accentDim },
+  card: { width: 150, backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, gap: 5 },
+  platformDot: { width: 6, height: 6, borderRadius: 3 },
+  cardTitle: { fontSize: 13, fontWeight: '700', color: C.text, lineHeight: 18 },
+  cardDj: { fontSize: 11, color: C.textSec },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  cardGenre: { fontSize: 10, color: C.textMuted, flex: 1 },
+  likeRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  likeCount: { fontSize: 10, color: C.textMuted },
+});
+
 // ─── Gig Countdown Banner ─────────────────────────────────────────────────────
 function GigCountdownBanner({ userId }: { userId: string }) {
   const [nextGig, setNextGig] = useState<{ venue_name: string; date: string; start_time: string | null } | null>(null);
@@ -551,7 +666,7 @@ const cb = StyleSheet.create({
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function MixesScreen() {
-  const { session, user, initialized } = useAuthStore();
+  const { session, user, profile, initialized } = useAuthStore();
   const [mixes, setMixes] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -703,6 +818,11 @@ export default function MixesScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* For You strip */}
+      {!loading && user && feedMode === 'forYou' && (
+        <ForYouStrip userId={user.id} userGenre={profile?.genre ?? null} />
+      )}
 
       {/* Feed */}
       {loading ? (
