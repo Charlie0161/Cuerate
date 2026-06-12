@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { sendPushNotification } from '../lib/notifications';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -67,6 +68,16 @@ export default function ApplyForGigModal({ request, onClose, onSuccess }: Props)
       }
       return;
     }
+
+    // Notify the venue owner — fire and forget
+    const djName = profile?.dj_name ?? 'A DJ';
+    sendPushNotification(
+      request.venue_id,
+      `New application for ${request.venue_name}`,
+      `${djName} applied for your ${request.date} gig.`,
+      { type: 'application_received', screen: 'gigs', requestId: request.id },
+    );
+
     onSuccess();
   }
 

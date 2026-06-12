@@ -11,6 +11,8 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { MixCardSkeleton, DJCardSkeleton } from '../components/SkeletonCard';
 import PostMixModal from './PostMixModal';
+import ProfileNudge from '../components/ProfileNudge';
+import ProfileScreen from './ProfileScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -639,33 +641,44 @@ function ForYouFeed({ userId, userGenre, session }: { userId: string; userGenre:
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: likedData } = await supabase
-      .from('likes')
-      .select('mix_id')
-      .eq('user_id', userId);
+    // Fetch liked IDs and followed user IDs in parallel
+    const [{ data: likedData }, { data: followData }] = await Promise.all([
+      supabase.from('likes').select('mix_id').eq('user_id', userId),
+      supabase.from('follows').select('following_id').eq('follower_id', userId),
+    ]);
     const likedIds = new Set((likedData ?? []).map((l: any) => l.mix_id));
+    const followedIds = new Set((followData ?? []).map((f: any) => f.following_id));
 
-    let q = supabase
-      .from('mix_feed')
-      .select('*')
-      .order('like_count', { ascending: false })
-      .limit(50);
+    // Fetch a broad pool — genre-matched + popular fallback
+    const genreKey = userGenre?.split(' ')[0] ?? null;
+    const [{ data: genrePool }, { data: popularPool }] = await Promise.all([
+      genreKey
+        ? supabase.from('mix_feed').select('*').ilike('genre', `%${genreKey}%`).limit(100)
+        : Promise.resolve({ data: [] }),
+      supabase.from('mix_feed').select('*').order('like_count', { ascending: false }).limit(100),
+    ]);
 
-    if (userGenre) q = q.ilike('genre', `%${userGenre.split(' ')[0]}%`);
-
-    const { data } = await q;
-    let results = (data ?? []).filter((m: any) => !likedIds.has(m.id));
-
-    if (results.length < 5 && userGenre) {
-      const { data: popular } = await supabase
-        .from('mix_feed')
-        .select('*')
-        .order('like_count', { ascending: false })
-        .limit(50);
-      results = (popular ?? []).filter((m: any) => !likedIds.has(m.id));
+    const seen = new Set<string>();
+    const pool: any[] = [];
+    for (const m of [...(genrePool ?? []), ...(popularPool ?? [])]) {
+      if (!seen.has(m.id) && !likedIds.has(m.id)) { seen.add(m.id); pool.push(m); }
     }
 
-    setPicks(results.map((m: any) => ({ ...m, _kind: 'mix' as const })));
+    // Score each mix: recency (decay) + likes + comments + follow boost
+    const now = Date.now();
+    const scored = pool.map(m => {
+      const ageHours = (now - new Date(m.created_at).getTime()) / 3_600_000;
+      const recencyScore = Math.max(0, 1 - ageHours / (7 * 24)); // decay over 7 days
+      const likeScore = Math.min((m.like_count ?? 0) / 50, 1);
+      const commentScore = Math.min((m.comment_count ?? 0) / 20, 1);
+      const followBoost = followedIds.has(m.user_id) ? 0.4 : 0;
+      const genreBoost = genreKey && m.genre?.toLowerCase().includes(genreKey.toLowerCase()) ? 0.3 : 0;
+      const score = recencyScore * 0.35 + likeScore * 0.3 + commentScore * 0.15 + followBoost + genreBoost;
+      return { m, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    setPicks(scored.slice(0, 40).map(({ m }) => ({ ...m, _kind: 'mix' as const })));
   }, [userId, userGenre]);
 
   useEffect(() => {
@@ -905,6 +918,7 @@ export default function MixesScreen() {
   const [search, setSearch] = useState('');
   const [feedMode, setFeedMode] = useState<'all' | 'forYou' | 'following'>('all');
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -1002,6 +1016,9 @@ export default function MixesScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Profile completion nudge */}
+      <ProfileNudge onPress={() => setShowProfile(true)} />
 
       {/* SoundCloud import nudge */}
       {user && profile?.soundcloud_username && feedMode !== 'following' && (
@@ -1137,6 +1154,10 @@ export default function MixesScreen() {
           }}
         />
       )}
+
+      <Modal visible={showProfile} animationType="slide" presentationStyle="pageSheet">
+        <ProfileScreen onClose={() => setShowProfile(false)} />
+      </Modal>
     </SafeAreaView>
   );
 }

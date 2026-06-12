@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, Image, ActivityIndicator, ScrollView, Alert, Modal, Share,
+  StatusBar, Image, ActivityIndicator, ScrollView, Alert, Modal, Share, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -879,6 +879,15 @@ export default function ProfileScreen({ onClose }: { onClose: () => void }) {
             <Ionicons name="log-out-outline" size={16} color={C.critical} />
             <Text style={s.dangerBtnText}>Sign out</Text>
           </TouchableOpacity>
+          <View style={s.legalRow}>
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.notion.so/Cuerate-Privacy-Policy-placeholder')}>
+              <Text style={s.legalLink}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <Text style={s.legalSep}>·</Text>
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.notion.so/Cuerate-Terms-of-Service-placeholder')}>
+              <Text style={s.legalLink}>Terms of Service</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={s.versionText}>Cuerate v1.0.0 · Beta</Text>
         </View>
 
@@ -1002,7 +1011,10 @@ const s = StyleSheet.create({
   roleHint: { fontSize: 11, color: C.textMuted, marginTop: 2 },
   feedbackBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: C.accentDim + '20', borderRadius: 10, borderWidth: 1, borderColor: C.accent + '40' },
   feedbackBtnText: { fontSize: 15, color: C.accent, fontWeight: '600' },
-  versionText: { fontSize: 11, color: C.textMuted, textAlign: 'center', marginTop: 14 },
+  versionText: { fontSize: 11, color: C.textMuted, textAlign: 'center', marginTop: 6 },
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 },
+  legalLink: { fontSize: 11, color: C.textMuted, textDecorationLine: 'underline' },
+  legalSep: { fontSize: 11, color: C.textMuted },
   adminBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1A1400', borderWidth: 1, borderColor: '#F0C04040', borderRadius: 14, padding: 16, marginBottom: 12 },
   adminBtnEmoji: { fontSize: 20 },
   adminBtnText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#F0C040' },

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, Profile } from '../lib/supabase';
+import { registerPushToken } from '../lib/notifications';
 
 interface AuthState {
   session: Session | null;
@@ -27,8 +28,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setSession: (session) => {
     set({ session, user: session?.user ?? null });
-    if (session?.user) get().fetchProfile();
-    else set({ profile: null });
+    if (session?.user) {
+      get().fetchProfile();
+      registerPushToken(session.user.id);
+    } else {
+      set({ profile: null });
+    }
   },
 
   setProfile: (profile) => set({ profile }),
@@ -92,6 +97,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ session, user: session?.user ?? null });
       if (session?.user) {
         await get().fetchProfile();
+        registerPushToken(session.user.id);
         // Apply role chosen during onboarding on first sign-in
         const role = await AsyncStorage.getItem('onboard_role');
         if (role) {

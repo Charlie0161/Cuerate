@@ -1,8 +1,10 @@
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 import AvatarButton from '../../src/components/AvatarButton';
 import MessagesButton from '../../src/components/MessagesButton';
+import NotificationsButton from '../../src/components/NotificationsButton';
 
 const ACCENT = '#7C5CFC';
 const MUTED = '#52516A';
@@ -14,7 +16,7 @@ export default function TabLayout() {
   const isFan = profile?.account_type === 'fan';
 
   // Fans only see Mixes, Directory, Sets
-  const hide = (tab: string) => isFan && !['mixes', 'directory', 'festival-sets'].includes(tab)
+  const hide = (tab: string) => isFan && !['mixes', 'directory', 'festival-sets', 'whats-on'].includes(tab)
     ? { href: null as any }
     : {};
 
@@ -27,7 +29,12 @@ export default function TabLayout() {
         headerTitleStyle: { fontWeight: '700', fontSize: 17 },
         headerLeft: () => <AvatarButton />,
         headerLeftContainerStyle: { paddingLeft: 16 },
-        headerRight: () => <MessagesButton />,
+        headerRight: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <NotificationsButton />
+            <MessagesButton />
+          </View>
+        ),
         headerRightContainerStyle: { paddingRight: 16 },
         tabBarStyle: {
           backgroundColor: SURFACE,
@@ -67,6 +74,10 @@ export default function TabLayout() {
       <Tabs.Screen name="festival-sets" options={{
         title: 'Sets',
         tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} />,
+      }} />
+      <Tabs.Screen name="whats-on" options={{
+        title: "What's On",
+        tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
       }} />
 
       {/* Hidden legacy screens */}

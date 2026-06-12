@@ -48,6 +48,15 @@ export async function sendPushNotification(
   data?: Record<string, any>,
 ) {
   try {
+    // Write in-app notification record regardless of push token
+    supabase.from('notifications').insert({
+      user_id: recipientUserId,
+      type: data?.type ?? 'default',
+      title,
+      body,
+      data: data ?? {},
+    });
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('push_token')

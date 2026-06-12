@@ -109,6 +109,7 @@ export default function GigApplicationsModal({ request, onClose, onFilled }: Pro
               ? `You've been accepted for ${request.date}! Check your booking email.`
               : `Your application for ${request.venue_name} on ${request.date} was not selected.`;
             await sendPushNotification(app.dj_id, notifTitle, notifBody, {
+              type: newStatus === 'accepted' ? 'application_accepted' : 'application_declined',
               screen: 'gigs',
               requestId: request.id,
             });

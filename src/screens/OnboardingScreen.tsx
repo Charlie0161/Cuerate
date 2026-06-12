@@ -43,12 +43,12 @@ const ROLE_OPTIONS = [
 ];
 
 const FEATURES = [
-  { icon: 'megaphone-outline' as const, text: 'Find and apply for gig slots near you' },
-  { icon: 'musical-notes-outline' as const, text: 'Build set lists and track your music' },
-  { icon: 'hardware-chip-outline' as const, text: 'Manage your DJ hardware and gear' },
-  { icon: 'people-outline' as const, text: 'Browse the DJ & venue directory' },
-  { icon: 'trophy-outline' as const, text: 'Explore festival sets from top DJs' },
-  { icon: 'calendar-outline' as const, text: 'Keep your gig calendar organised' },
+  { icon: 'megaphone-outline' as const,      text: 'Find and apply for gig slots near you' },
+  { icon: 'radio-outline' as const,          text: 'Share mixes and discover new sounds' },
+  { icon: 'calendar-outline' as const,       text: "See what's on — powered by Ticketmaster & Skiddle" },
+  { icon: 'chatbubble-outline' as const,     text: 'Message DJs and venues directly' },
+  { icon: 'people-outline' as const,         text: 'Browse the DJ & venue directory' },
+  { icon: 'hardware-chip-outline' as const,  text: 'Manage your DJ hardware and gear' },
 ];
 
 interface Props {
@@ -59,7 +59,7 @@ export default function OnboardingScreen({ onDone }: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
   const [selectedRole, setSelectedRole] = useState<string>('dj');
-  const totalPages = 3;
+  const totalPages = 4;
 
   function goNext() {
     if (page < totalPages - 1) {
@@ -138,6 +138,40 @@ export default function OnboardingScreen({ onDone }: Props) {
                   <Ionicons name="checkmark-circle" size={20} color={C.accent} />
                 )}
               </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Slide 4: Quick start */}
+        <View style={s.slide}>
+          <View style={s.logoWrap}>
+            <Ionicons name="rocket-outline" size={48} color={C.accent} />
+          </View>
+          <Text style={s.slideTitle}>You're all set 🎉</Text>
+          <Text style={s.slideSubtitle}>Here's what to do first:</Text>
+          <View style={s.featureList}>
+            {(selectedRole === 'venue' ? [
+              { icon: 'person-circle-outline' as const, text: 'Complete your venue profile so DJs can find you' },
+              { icon: 'megaphone-outline' as const,     text: 'Post a gig slot to start receiving applications' },
+              { icon: 'people-outline' as const,        text: 'Browse the DJ directory to find talent directly' },
+              { icon: 'calendar-outline' as const,      text: "Add your upcoming nights to What's On" },
+            ] : selectedRole === 'fan' ? [
+              { icon: 'radio-outline' as const,         text: 'Explore Mixes — tap For You for personalised picks' },
+              { icon: 'people-outline' as const,        text: 'Follow DJs you like in the Directory' },
+              { icon: 'calendar-outline' as const,      text: "Check What's On for events near you" },
+              { icon: 'musical-note-outline' as const,  text: 'Browse Sets from your favourite festival DJs' },
+            ] : [
+              { icon: 'person-circle-outline' as const, text: 'Complete your profile — add genre, location and bio' },
+              { icon: 'radio-outline' as const,         text: 'Share a mix to get discovered by venues' },
+              { icon: 'megaphone-outline' as const,     text: 'Browse Gigs and apply for slots near you' },
+              { icon: 'chatbubble-outline' as const,    text: 'Message venues directly from their profile' },
+            ]).map((tip, i) => (
+              <View key={i} style={s.featureRow}>
+                <View style={s.featureIconWrap}>
+                  <Ionicons name={tip.icon} size={18} color={C.accent} />
+                </View>
+                <Text style={s.featureText}>{tip.text}</Text>
+              </View>
             ))}
           </View>
         </View>

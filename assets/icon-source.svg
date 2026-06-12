@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Solid background — OS applies the shape mask -->
+  <rect width="1024" height="1024" fill="#0A0A0C"/>
+
+  <!-- Subtle radial glow behind the C -->
+  <radialGradient id="glow" cx="50%" cy="50%" r="40%">
+    <stop offset="0%" stop-color="#7C5CFC" stop-opacity="0.18"/>
+    <stop offset="100%" stop-color="#7C5CFC" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <!-- Bold C arc, centred at 512,512, radius 220 -->
+  <g transform="translate(512,512)">
+    <!-- Main arc -->
+    <path d="M 165 -210 A 245 245 0 1 0 165 210"
+      fill="none"
+      stroke="#7C5CFC"
+      stroke-width="88"
+      stroke-linecap="round"/>
+    <!-- Top accent dot -->
+    <circle cx="165" cy="-210" r="50" fill="#7C5CFC"/>
+    <!-- Bottom accent dot — slightly lighter for depth -->
+    <circle cx="165" cy="210" r="50" fill="#AFA9EC"/>
+  </g>
+</svg>

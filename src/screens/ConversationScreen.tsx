@@ -122,7 +122,7 @@ export default function ConversationScreen({ conversationId, otherName, onBack }
     if (conv) {
       const recipientId = conv.participant_1 === user.id ? conv.participant_2 : conv.participant_1;
       const senderName = profileRes.data?.dj_name ?? 'Someone';
-      sendPushNotification(recipientId, `New message from ${senderName}`, content, { screen: 'messages', conversationId });
+      sendPushNotification(recipientId, `New message from ${senderName}`, content, { type: 'new_message', screen: 'messages', conversationId });
     }
 
     setSending(false);

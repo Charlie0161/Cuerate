@@ -6,6 +6,7 @@ import GigCalendarScreen from './GigCalendarScreen';
 import GigCalculatorScreen from './GigCalculatorScreen';
 import VenueGigsScreen from './VenueGigsScreen';
 import GigChecklistScreen from './GigChecklistScreen';
+import MyApplicationsScreen from './MyApplicationsScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', border: '#2A2A38',
@@ -17,6 +18,7 @@ const DJ_TABS = [
   { id: 'calendar', label: 'My Calendar' },
   { id: 'checklist', label: 'Checklist' },
   { id: 'calc', label: 'Calculator' },
+  { id: 'applied', label: 'Applications' },
 ];
 
 const VENUE_TABS = [
@@ -24,7 +26,7 @@ const VENUE_TABS = [
   { id: 'browse', label: 'Browse' },
 ];
 
-type DJTab = 'browse' | 'calendar' | 'checklist' | 'calc';
+type DJTab = 'browse' | 'calendar' | 'checklist' | 'calc' | 'applied';
 type VenueTab = 'my-gigs' | 'browse';
 
 export default function GigsHubScreen() {
@@ -80,6 +82,7 @@ export default function GigsHubScreen() {
         {djTab === 'calendar' && <GigCalendarScreen />}
         {djTab === 'checklist' && <GigChecklistScreen />}
         {djTab === 'calc' && <GigCalculatorScreen />}
+        {djTab === 'applied' && <MyApplicationsScreen />}
       </View>
     </View>
   );

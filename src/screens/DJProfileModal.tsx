@@ -159,7 +159,7 @@ export default function DJProfileModal({ dj, onClose }: DJProfileModalProps) {
       setFollowerCount(c => c + 1);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const myName = (await supabase.from('profiles').select('dj_name').eq('id', user.id).single()).data?.dj_name ?? 'Someone';
-      await sendPushNotification(dj.id, `${myName} followed you`, 'Check out their profile on Cuerate.', { screen: 'directory' });
+      await sendPushNotification(dj.id, `${myName} followed you`, 'Check out their profile on Cuerate.', { type: 'new_follower', screen: 'directory' });
     }
     setFollowLoading(false);
   }
