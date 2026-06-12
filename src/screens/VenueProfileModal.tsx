@@ -12,6 +12,7 @@ import AddVenueReviewModal from './AddVenueReviewModal';
 import ApplyForGigModal, { BookingRequest } from './ApplyForGigModal';
 import EditVenueModal from './EditVenueModal';
 import VenueClaimModal from './VenueClaimModal';
+import MessagesScreen from './MessagesScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', raised: '#1C1C26',
@@ -67,6 +68,7 @@ export default function VenueProfileModal({ venue: initialVenue, onClose, onRevi
   const [appliedIds, setAppliedIds]     = useState<Set<string>>(new Set());
   const [applyTarget, setApplyTarget]   = useState<BookingRequest | null>(null);
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
   const { user, profile } = useAuthStore();
   const isVenueAccount = profile?.is_venue === true;
   const isOwner = !!user && venue.owner_id === user.id;
@@ -231,6 +233,14 @@ export default function VenueProfileModal({ venue: initialVenue, onClose, onRevi
                 ) : null}
               </View>
             ) : null}
+
+            {/* Message venue owner */}
+            {user && venue.owner_id && venue.owner_id !== user.id && (
+              <TouchableOpacity style={p.messageBtn} onPress={() => setShowMessages(true)}>
+                <Ionicons name="chatbubble-outline" size={16} color={C.accent} />
+                <Text style={p.messageBtnText}>Message venue</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Contact */}
             {(venue.website_url || venue.booking_email || venue.instagram_url) ? (
@@ -414,6 +424,16 @@ export default function VenueProfileModal({ venue: initialVenue, onClose, onRevi
             }}
           />
         )}
+
+        {showMessages && (
+          <Modal visible animationType="slide" presentationStyle="pageSheet">
+            <MessagesScreen
+              onClose={() => setShowMessages(false)}
+              openWithUserId={venue.owner_id!}
+              openWithUserName={venue.name}
+            />
+          </Modal>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -423,6 +443,8 @@ const p = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
   reviewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.accentDim, backgroundColor: C.accentDim + '20' },
   reviewBtnText: { fontSize: 13, color: C.accent, fontWeight: '600' },
+  messageBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: C.accentDim, backgroundColor: C.accentDim + '20' },
+  messageBtnText: { fontSize: 15, fontWeight: '700', color: C.accent },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border },
   heroPhoto: { width: 80, height: 80, borderRadius: 12, resizeMode: 'cover' },
   heroPlaceholder: { width: 80, height: 80, borderRadius: 12, backgroundColor: C.accentDim + '30', alignItems: 'center', justifyContent: 'center' },

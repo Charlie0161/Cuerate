@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, TextInput, RefreshControl,
-  Linking, FlatList, Image, Modal,
+  Linking, FlatList, Image, Modal, Share, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -406,10 +406,27 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
           <Ionicons name="open-outline" size={15} color={C.textSec} />
           <Text style={mc.actionText}>Web</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={mc.actionBtn} onPress={() => Share.share({ message: `Check out this mix on Cuerate: ${mix.external_url}`, url: mix.external_url })}>
+          <Ionicons name="share-outline" size={15} color={C.textSec} />
+          <Text style={mc.actionText}>Share</Text>
+        </TouchableOpacity>
         {isOwner && (
           <TouchableOpacity style={mc.actionBtn} onPress={() => setShowEdit(true)}>
             <Ionicons name="pencil-outline" size={15} color={C.textSec} />
             <Text style={mc.actionText}>Edit</Text>
+          </TouchableOpacity>
+        )}
+        {isOwner && (
+          <TouchableOpacity style={mc.actionBtn} onPress={() => {
+            Alert.alert('Delete mix', 'Remove this from the feed?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: async () => {
+                await supabase.from('mixes').delete().eq('id', mix.id);
+                onRefresh();
+              }},
+            ]);
+          }}>
+            <Ionicons name="trash-outline" size={15} color={C.textMuted} />
           </TouchableOpacity>
         )}
       </View>
