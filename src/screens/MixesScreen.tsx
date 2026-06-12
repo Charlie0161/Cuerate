@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, TextInput, RefreshControl,
-  Linking, FlatList, Image,
+  Linking, FlatList, Image, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +50,7 @@ type Mix = {
   avatar_url?: string | null;
   like_count?: number;
   comment_count?: number;
+  user_id?: string;
 };
 
 type Comment = {
@@ -184,8 +185,109 @@ function TrackCard({ track }: { track: TrackItem }) {
   );
 }
 
+// ─── Edit Mix Modal ──────────────────────────────────────────────────────────
+const EDIT_GENRES = ['House', 'Techno', 'Drum & Bass', 'UK Garage', 'Jungle', 'Trance', 'Hip-Hop', 'Afrobeats', 'Disco', 'Ambient', 'Other'];
+
+function EditMixModal({ mix, onClose, onSuccess }: { mix: Mix; onClose: () => void; onSuccess: () => void }) {
+  const [title, setTitle] = useState(mix.title);
+  const [description, setDescription] = useState(mix.description ?? '');
+  const [type, setType] = useState<'set' | 'track'>(mix.type);
+  const [genre, setGenre] = useState(mix.genre ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!title.trim()) { setError('Title is required.'); return; }
+    setSaving(true);
+    const { error: dbErr } = await supabase
+      .from('mixes')
+      .update({ title: title.trim(), description: description.trim() || null, type, genre: genre || null })
+      .eq('id', mix.id);
+    setSaving(false);
+    if (dbErr) { setError('Failed to save — try again.'); return; }
+    onSuccess();
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+        <View style={em.header}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={C.textSec} />
+          </TouchableOpacity>
+          <Text style={em.headerTitle}>Edit mix</Text>
+          <TouchableOpacity style={[em.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
+            {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={em.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={em.body} keyboardShouldPersistTaps="handled">
+          <Text style={em.label}>Title</Text>
+          <TextInput style={em.input} value={title} onChangeText={setTitle} placeholderTextColor={C.textMuted} />
+
+          <Text style={em.label}>Type</Text>
+          <View style={em.typeRow}>
+            {(['set', 'track'] as const).map(t => (
+              <TouchableOpacity key={t} style={[em.typeBtn, type === t && em.typeBtnActive]} onPress={() => setType(t)}>
+                <Ionicons name={t === 'set' ? 'disc-outline' : 'musical-note-outline'} size={15} color={type === t ? C.accent : C.textSec} />
+                <Text style={[em.typeBtnText, type === t && { color: C.accent }]}>{t === 'set' ? 'DJ Set' : 'Track'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={em.label}>Genre</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+            {EDIT_GENRES.map(g => (
+              <TouchableOpacity
+                key={g}
+                style={[em.genrePill, genre === g && em.genrePillActive]}
+                onPress={() => setGenre(genre === g ? '' : g)}
+              >
+                <Text style={[em.genrePillText, genre === g && { color: C.accent }]}>{g}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={em.label}>Description</Text>
+          <TextInput
+            style={[em.input, em.textarea]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Tracklist, notes…"
+            placeholderTextColor={C.textMuted}
+            multiline
+            numberOfLines={4}
+          />
+
+          {error && <Text style={em.error}>{error}</Text>}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+const em = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: C.text },
+  saveBtn: { backgroundColor: C.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  saveBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  body: { padding: 16, gap: 4, paddingBottom: 60 },
+  label: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 6 },
+  input: { backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: C.text },
+  textarea: { height: 90, textAlignVertical: 'top', paddingTop: 12 },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
+  typeBtnActive: { borderColor: C.accent, backgroundColor: C.accentDim + '30' },
+  typeBtnText: { fontSize: 14, fontWeight: '600', color: C.textSec },
+  genrePill: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
+  genrePillActive: { borderColor: C.accent, backgroundColor: C.accentDim + '20' },
+  genrePillText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  error: { fontSize: 13, color: C.critical, marginTop: 12, textAlign: 'center' },
+});
+
 // ─── Mix Card ────────────────────────────────────────────────────────────────
 function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefresh: () => void }) {
+  const [showEdit, setShowEdit] = useState(false);
+  const isOwner = !!session && session.user.id === mix.user_id;
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(mix.like_count ?? 0);
   const [showComments, setShowComments] = useState(false);
@@ -304,7 +406,20 @@ function MixCard({ mix, session, onRefresh }: { mix: Mix; session: any; onRefres
           <Ionicons name="open-outline" size={15} color={C.textSec} />
           <Text style={mc.actionText}>Web</Text>
         </TouchableOpacity>
+        {isOwner && (
+          <TouchableOpacity style={mc.actionBtn} onPress={() => setShowEdit(true)}>
+            <Ionicons name="pencil-outline" size={15} color={C.textSec} />
+            <Text style={mc.actionText}>Edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
+      {showEdit && (
+        <EditMixModal
+          mix={mix}
+          onClose={() => setShowEdit(false)}
+          onSuccess={() => { setShowEdit(false); onRefresh(); }}
+        />
+      )}
 
       {/* Comments */}
       {showComments && (
