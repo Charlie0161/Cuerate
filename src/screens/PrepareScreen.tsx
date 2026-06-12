@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import SetBuilderScreen from './SetBuilderScreen';
 import USBRealityCheckScreen from './USBRealityCheckScreen';
+import BpmTapperScreen from './BpmTapperScreen';
 
 const C = {
   bg: '#0A0A0C', surface: '#13131A', border: '#2A2A38',
@@ -11,10 +12,11 @@ const C = {
 const TABS = [
   { id: 'sets', label: 'Set Builder' },
   { id: 'usb', label: 'USB Check' },
+  { id: 'bpm', label: 'BPM Tap' },
 ];
 
 export default function PrepareScreen() {
-  const [active, setActive] = useState<'sets' | 'usb'>('sets');
+  const [active, setActive] = useState<'sets' | 'usb' | 'bpm'>('sets');
 
   return (
     <View style={s.root}>
@@ -33,7 +35,7 @@ export default function PrepareScreen() {
         ))}
       </View>
       <View style={{ flex: 1 }}>
-        {active === 'sets' ? <SetBuilderScreen /> : <USBRealityCheckScreen />}
+        {active === 'sets' ? <SetBuilderScreen /> : active === 'usb' ? <USBRealityCheckScreen /> : <BpmTapperScreen />}
       </View>
     </View>
   );

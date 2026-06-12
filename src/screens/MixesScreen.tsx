@@ -499,6 +499,56 @@ function SuggestedDJs({ currentUserId, onFollowed }: { currentUserId: string; on
   );
 }
 
+// ─── Gig Countdown Banner ─────────────────────────────────────────────────────
+function GigCountdownBanner({ userId }: { userId: string }) {
+  const [nextGig, setNextGig] = useState<{ venue_name: string; date: string; start_time: string | null } | null>(null);
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    supabase
+      .from('dj_gigs')
+      .select('venue_name, date, start_time')
+      .eq('dj_id', userId)
+      .gte('date', today)
+      .order('date', { ascending: true })
+      .limit(1)
+      .single()
+      .then(({ data }) => setNextGig(data ?? null));
+  }, [userId]);
+
+  if (!nextGig) return null;
+
+  const days = Math.ceil((new Date(nextGig.date).getTime() - Date.now()) / 86400000);
+  const label = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+  const urgent = days <= 2;
+
+  return (
+    <View style={[cb.banner, urgent && cb.bannerUrgent]}>
+      <Ionicons name="musical-notes-outline" size={14} color={urgent ? C.warning : C.accent} />
+      <View style={{ flex: 1 }}>
+        <Text style={[cb.bannerTitle, urgent && { color: C.warning }]} numberOfLines={1}>
+          Next gig: {nextGig.venue_name}
+        </Text>
+        <Text style={cb.bannerSub}>
+          {label}{nextGig.start_time ? ` · ${nextGig.start_time}` : ''}
+        </Text>
+      </View>
+      <View style={[cb.dayBadge, urgent && { backgroundColor: C.warning + '20', borderColor: C.warning + '60' }]}>
+        <Text style={[cb.dayBadgeText, urgent && { color: C.warning }]}>{days}d</Text>
+      </View>
+    </View>
+  );
+}
+
+const cb = StyleSheet.create({
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, backgroundColor: C.accentDim + '25', borderRadius: 12, borderWidth: 1, borderColor: C.accent + '40', padding: 12 },
+  bannerUrgent: { backgroundColor: C.warning + '12', borderColor: C.warning + '40' },
+  bannerTitle: { fontSize: 13, fontWeight: '700', color: C.accent },
+  bannerSub: { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  dayBadge: { backgroundColor: C.accentDim + '40', borderRadius: 8, borderWidth: 1, borderColor: C.accent + '40', paddingHorizontal: 8, paddingVertical: 4 },
+  dayBadgeText: { fontSize: 13, fontWeight: '800', color: C.accent },
+});
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function MixesScreen() {
   const { session, user, initialized } = useAuthStore();
@@ -608,6 +658,9 @@ export default function MixesScreen() {
           <Text style={[s.feedTabText, feedMode === 'following' && s.feedTabTextActive]}>Following</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Gig countdown */}
+      {user && <GigCountdownBanner userId={user.id} />}
 
       {/* Search */}
       <View style={s.searchBar}>
