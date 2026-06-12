@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
-  ScrollView, Animated,
+  ScrollView, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import AuthScreen from './AuthScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +60,8 @@ export default function OnboardingScreen({ onDone }: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
   const [selectedRole, setSelectedRole] = useState<string>('dj');
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
   const totalPages = 4;
 
   function goNext() {
@@ -186,18 +189,33 @@ export default function OnboardingScreen({ onDone }: Props) {
 
       {/* CTA */}
       <View style={s.footer}>
-        <TouchableOpacity style={s.btn} onPress={goNext} activeOpacity={0.85}>
-          <Text style={s.btnText}>
-            {page === totalPages - 1 ? "Let's go" : 'Continue'}
-          </Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
-        </TouchableOpacity>
-        {page < totalPages - 1 && (
-          <TouchableOpacity onPress={finish} style={s.skipBtn}>
-            <Text style={s.skipText}>Skip</Text>
-          </TouchableOpacity>
+        {page < totalPages - 1 ? (
+          <>
+            <TouchableOpacity style={s.btn} onPress={goNext} activeOpacity={0.85}>
+              <Text style={s.btnText}>Continue</Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={finish} style={s.skipBtn}>
+              <Text style={s.skipText}>Skip</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity style={s.btn} onPress={() => { setAuthMode('signup'); setShowAuth(true); }} activeOpacity={0.85}>
+              <Ionicons name="person-add-outline" size={16} color="#fff" />
+              <Text style={s.btnText}>Create an account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.loginBtn} onPress={() => { setAuthMode('login'); setShowAuth(true); }} activeOpacity={0.85}>
+              <Text style={s.loginBtnText}>I already have an account</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
+
+      {/* Auth modal — completing auth calls finish() */}
+      <Modal visible={showAuth} animationType="slide" presentationStyle="pageSheet">
+        <AuthScreen initialMode={authMode} onClose={async () => { setShowAuth(false); await finish(); }} />
+      </Modal>
     </View>
   );
 }
@@ -265,4 +283,6 @@ const s = StyleSheet.create({
   btnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
   skipBtn: { alignItems: 'center', paddingVertical: 4 },
   skipText: { fontSize: 14, color: C.textMuted },
+  loginBtn: { alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: C.border },
+  loginBtnText: { fontSize: 15, fontWeight: '600', color: C.textSec },
 });

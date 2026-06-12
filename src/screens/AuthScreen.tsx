@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -23,8 +24,8 @@ const C = {
 
 type Mode = 'login' | 'signup' | 'forgot';
 
-export default function AuthScreen({ onClose }: { onClose?: () => void }) {
-  const [mode, setMode] = useState<Mode>('login');
+export default function AuthScreen({ onClose, initialMode }: { onClose?: () => void; initialMode?: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [djName, setDjName] = useState('');
@@ -88,6 +89,29 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
       setMode('login');
     } catch (e: any) {
       setError(e.message ?? 'Failed to send reset email.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAppleSignIn() {
+    setLoading(true);
+    setError('');
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken!,
+      });
+      if (error) throw error;
+      onClose?.();
+    } catch (e: any) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') setError('Apple sign-in failed. Try again.');
     } finally {
       setLoading(false);
     }
@@ -282,6 +306,17 @@ export default function AuthScreen({ onClose }: { onClose?: () => void }) {
                     {mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
                   </Text>
                 </TouchableOpacity>
+                {Platform.OS === 'ios' && (
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={mode === 'login'
+                      ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                      : AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                    cornerRadius={12}
+                    style={s.appleBtn}
+                    onPress={handleAppleSignIn}
+                  />
+                )}
               </>
             )}
           </View>
@@ -334,6 +369,7 @@ const s = StyleSheet.create({
   dividerText: { fontSize: 13, color: C.textMuted },
   socialBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 12, height: 52, borderWidth: 1 },
   socialBtnText: { fontSize: 15, fontWeight: '600' },
+  appleBtn: { height: 52, width: '100%' },
   accountTypeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#2A2A38', backgroundColor: '#13131A' },
   accountTypeBtnActive: { borderColor: '#7C5CFC', backgroundColor: 'rgba(61,46,138,0.2)' },
   accountTypeBtnText: { fontSize: 13, fontWeight: '600', color: '#52516A' },
