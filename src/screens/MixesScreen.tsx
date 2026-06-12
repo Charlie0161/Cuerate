@@ -596,8 +596,10 @@ function ForYouFeed({ userId, userGenre, session }: { userId: string; userGenre:
 // ─── SoundCloud Sync Banner ──────────────────────────────────────────────────
 function SoundCloudSyncBanner({ userId, username }: { userId: string; username: string }) {
   const [hasImported, setHasImported] = useState<boolean | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [url, setUrl] = useState('');
   const [result, setResult] = useState<string | null>(null);
+  const inputRef = React.useRef<any>(null);
 
   useEffect(() => {
     supabase
@@ -609,112 +611,104 @@ function SoundCloudSyncBanner({ userId, username }: { userId: string; username: 
       .then(({ data }) => setHasImported((data?.length ?? 0) > 0));
   }, [userId]);
 
-  if (hasImported !== false) return null; // hide once imported or still loading
+  if (hasImported !== false) return null;
 
-  async function sync() {
-    setSyncing(true);
+  async function addByUrl() {
+    const trimmed = url.trim();
+    if (!trimmed.includes('soundcloud.com/')) {
+      setResult('Paste a SoundCloud link, e.g. soundcloud.com/yourname/your-set');
+      return;
+    }
+    setAdding(true);
     setResult(null);
     try {
-      const CLIENT_ID = 'W6Nns4HSaBBNCc9t0l8GGVFhbu96vC6M';
-
-      // Try v2 API first, fall back to v1
-      let scUserId: string | null = null;
-      for (const base of ['https://api-v2.soundcloud.com', 'https://api.soundcloud.com']) {
-        const res = await fetch(`${base}/resolve?url=https://soundcloud.com/${username}&client_id=${CLIENT_ID}`);
-        if (res.ok) {
-          const json = await res.json();
-          scUserId = json.id ? String(json.id) : null;
-          if (scUserId) break;
-        }
-      }
-
-      if (!scUserId) {
-        setResult(`Could not find SoundCloud user "@${username}". Make sure your username is correct in your profile.`);
+      // oEmbed is public — no client_id needed
+      const oembedRes = await fetch(
+        `https://soundcloud.com/oembed?url=${encodeURIComponent(trimmed)}&format=json`
+      );
+      if (!oembedRes.ok) {
+        setResult('Could not find that track — check the link and try again.');
         return;
       }
+      const oembed = await oembedRes.json();
+      const isSet = trimmed.includes('/sets/');
+      const canonicalUrl = trimmed.split('?')[0].replace(/\/$/, '');
 
-      // Fetch both playlists (sets) and individual tracks in parallel
-      const [plRes, trRes] = await Promise.all([
-        fetch(`https://api-v2.soundcloud.com/users/${scUserId}/playlists?client_id=${CLIENT_ID}&limit=50`),
-        fetch(`https://api-v2.soundcloud.com/users/${scUserId}/tracks?client_id=${CLIENT_ID}&limit=50`),
-      ]);
-
-      const playlists: any[] = plRes.ok ? ((await plRes.json()).collection ?? []) : [];
-      const tracks: any[] = trRes.ok ? ((await trRes.json()).collection ?? []) : [];
-
-      const setRows = playlists
-        .filter(p => p.permalink_url && p.title && p.sharing === 'public')
-        .map(p => ({
-          user_id: userId,
-          title: p.title,
-          description: p.description ?? null,
-          type: 'set' as const,
-          platform: 'soundcloud',
-          external_url: p.permalink_url,
-          thumbnail_url: p.artwork_url ? p.artwork_url.replace('-large', '-t300x300') : null,
-          genre: p.genre ?? null,
-        }));
-
-      const trackRows = tracks
-        .filter(t => t.permalink_url && t.title && t.sharing === 'public')
-        .map(t => ({
-          user_id: userId,
-          title: t.title,
-          description: t.description ?? null,
-          type: 'track' as const,
-          platform: 'soundcloud',
-          external_url: t.permalink_url,
-          thumbnail_url: t.artwork_url ? t.artwork_url.replace('-large', '-t300x300') : null,
-          genre: t.genre ?? null,
-        }));
-
-      const rows = [...setRows, ...trackRows];
-
-      if (rows.length === 0) {
-        setResult('No public tracks or sets found. Check your SoundCloud privacy settings.');
-        return;
-      }
-
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('mixes')
-        .upsert(rows, { onConflict: 'user_id,external_url', ignoreDuplicates: true })
+        .upsert({
+          user_id: userId,
+          title: oembed.title ?? 'Untitled',
+          description: null,
+          type: isSet ? 'set' : 'track',
+          platform: 'soundcloud',
+          external_url: canonicalUrl,
+          thumbnail_url: oembed.thumbnail_url ?? null,
+          genre: null,
+        }, { onConflict: 'user_id,external_url', ignoreDuplicates: true })
         .select('id');
 
-      const added = data?.length ?? 0;
-      setResult(`${added} item${added !== 1 ? 's' : ''} imported!`);
-      if (added > 0) setHasImported(true);
-    } catch (e) {
-      setResult('Sync failed — check your connection and try again.');
+      if (error) { setResult('Failed to save — try again.'); return; }
+      setResult('Added! Paste another link or close.');
+      setUrl('');
+      setHasImported(false); // keep banner open so they can add more
+      // re-check after short delay in case they added their first
+      setTimeout(() => {
+        supabase.from('mixes').select('id').eq('user_id', userId).eq('platform', 'soundcloud').limit(1)
+          .then(({ data }) => setHasImported((data?.length ?? 0) > 0));
+      }, 1000);
+    } catch {
+      setResult('Something went wrong — check your connection.');
     } finally {
-      setSyncing(false);
+      setAdding(false);
     }
   }
 
   return (
-    <View style={scb.banner}>
-      <View style={scb.iconWrap}>
-        <Ionicons name="musical-note" size={16} color="#FF5500" />
+    <View style={scb.wrap}>
+      <View style={scb.header}>
+        <View style={scb.iconWrap}>
+          <Ionicons name="musical-note" size={16} color="#FF5500" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={scb.title}>Add your SoundCloud sets</Text>
+          <Text style={scb.sub}>Paste a link to any public track or set</Text>
+        </View>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={scb.title}>Import your SoundCloud sets</Text>
-        <Text style={scb.sub}>{result ?? `Tap to import your public sets from @${username}`}</Text>
+      <View style={scb.inputRow}>
+        <TextInput
+          ref={inputRef}
+          style={scb.input}
+          value={url}
+          onChangeText={setUrl}
+          placeholder="soundcloud.com/yourname/your-set"
+          placeholderTextColor={C.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          onSubmitEditing={addByUrl}
+        />
+        <TouchableOpacity style={[scb.btn, adding && { opacity: 0.6 }]} onPress={addByUrl} disabled={adding}>
+          {adding
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="add" size={18} color="#fff" />}
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={[scb.btn, syncing && { opacity: 0.6 }]} onPress={sync} disabled={syncing}>
-        {syncing
-          ? <ActivityIndicator size="small" color="#FF5500" />
-          : <Text style={scb.btnText}>Import</Text>}
-      </TouchableOpacity>
+      {result && <Text style={scb.result}>{result}</Text>}
     </View>
   );
 }
 
 const scb = StyleSheet.create({
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, backgroundColor: '#1A0E00', borderRadius: 12, borderWidth: 1, borderColor: '#FF550040', padding: 12 },
+  wrap: { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#1A0E00', borderRadius: 12, borderWidth: 1, borderColor: '#FF550040', padding: 12, gap: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FF550020', alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 13, fontWeight: '700', color: C.text },
   sub: { fontSize: 11, color: C.textMuted, marginTop: 1 },
-  btn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FF5500' },
-  btnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  inputRow: { flexDirection: 'row', gap: 8 },
+  input: { flex: 1, backgroundColor: C.raised, borderRadius: 8, borderWidth: 1, borderColor: '#FF550040', paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: C.text },
+  btn: { width: 38, height: 38, borderRadius: 8, backgroundColor: '#FF5500', alignItems: 'center', justifyContent: 'center' },
+  result: { fontSize: 12, color: C.textSec },
 });
 
 // ─── Gig Countdown Banner ─────────────────────────────────────────────────────
