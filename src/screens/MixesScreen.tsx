@@ -499,120 +499,99 @@ function SuggestedDJs({ currentUserId, onFollowed }: { currentUserId: string; on
   );
 }
 
-// ─── For You Strip ───────────────────────────────────────────────────────────
-type ForYouMix = {
-  id: string;
-  title: string;
-  dj_name: string | null;
-  genre: string | null;
-  platform: string;
-  external_url: string;
-  like_count: number;
-};
-
-function ForYouStrip({ userId, userGenre }: { userId: string; userGenre: string | null }) {
-  const [picks, setPicks] = useState<ForYouMix[]>([]);
+// ─── For You Feed ────────────────────────────────────────────────────────────
+function ForYouFeed({ userId, userGenre, session }: { userId: string; userGenre: string | null; session: any }) {
+  const [picks, setPicks] = useState<(Mix & { _kind: 'mix' })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      // Fetch liked mix IDs so we can exclude them
-      const { data: likedData } = await supabase
-        .from('likes')
-        .select('mix_id')
-        .eq('user_id', userId);
-      const likedIds = new Set((likedData ?? []).map((l: any) => l.mix_id));
+  const load = useCallback(async () => {
+    const { data: likedData } = await supabase
+      .from('likes')
+      .select('mix_id')
+      .eq('user_id', userId);
+    const likedIds = new Set((likedData ?? []).map((l: any) => l.mix_id));
 
-      // Genre-matched query, fallback to all if no genre
-      let q = supabase
+    let q = supabase
+      .from('mix_feed')
+      .select('*')
+      .order('like_count', { ascending: false })
+      .limit(50);
+
+    if (userGenre) q = q.ilike('genre', `%${userGenre.split(' ')[0]}%`);
+
+    const { data } = await q;
+    let results = (data ?? []).filter((m: any) => !likedIds.has(m.id));
+
+    if (results.length < 5 && userGenre) {
+      const { data: popular } = await supabase
         .from('mix_feed')
-        .select('id, title, dj_name, genre, platform, external_url, like_count')
-        .eq('type', 'set')
+        .select('*')
         .order('like_count', { ascending: false })
-        .limit(30);
-
-      if (userGenre) q = q.ilike('genre', `%${userGenre.split(' ')[0]}%`);
-
-      const { data } = await q;
-      const filtered = (data ?? [])
-        .filter((m: any) => !likedIds.has(m.id))
-        .slice(0, 10) as ForYouMix[];
-
-      // If genre match returns < 3, broaden to top mixes overall
-      if (filtered.length < 3) {
-        const { data: popular } = await supabase
-          .from('mix_feed')
-          .select('id, title, dj_name, genre, platform, external_url, like_count')
-          .eq('type', 'set')
-          .order('like_count', { ascending: false })
-          .limit(20);
-        const broad = (popular ?? [])
-          .filter((m: any) => !likedIds.has(m.id))
-          .slice(0, 10) as ForYouMix[];
-        setPicks(broad);
-      } else {
-        setPicks(filtered);
-      }
-      setLoading(false);
+        .limit(50);
+      results = (popular ?? []).filter((m: any) => !likedIds.has(m.id));
     }
-    load();
+
+    setPicks(results.map((m: any) => ({ ...m, _kind: 'mix' as const })));
   }, [userId, userGenre]);
 
-  if (loading || picks.length === 0) return null;
+  useEffect(() => {
+    load().finally(() => setLoading(false));
+  }, [load]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  if (loading) {
+    return (
+      <FlatList
+        data={[1, 2, 3, 4]}
+        keyExtractor={i => String(i)}
+        contentContainerStyle={{ padding: 16, gap: 12 }}
+        scrollEnabled={false}
+        renderItem={() => <MixCardSkeleton />}
+      />
+    );
+  }
+
+  if (picks.length === 0) {
+    return (
+      <View style={s.empty}>
+        <Ionicons name="sparkles-outline" size={48} color={C.textMuted} />
+        <Text style={s.emptyTitle}>Nothing to recommend yet</Text>
+        <Text style={s.emptyBody}>Like some mixes and make sure your profile genre is set so we can tailor this feed.</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={fy.wrap}>
-      <View style={fy.header}>
-        <Ionicons name="sparkles" size={13} color={C.accent} />
-        <Text style={fy.heading}>Recommended for you</Text>
-        {userGenre && <Text style={fy.genreTag}>{userGenre}</Text>}
-      </View>
-      <FlatList
-        data={picks}
-        keyExtractor={m => m.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
-        renderItem={({ item }) => {
-          const col = PLATFORM_COLORS[item.platform] ?? C.textMuted;
-          return (
-            <TouchableOpacity
-              style={fy.card}
-              onPress={() => Linking.openURL(item.external_url)}
-              activeOpacity={0.75}
-            >
-              <View style={[fy.platformDot, { backgroundColor: col }]} />
-              <Text style={fy.cardTitle} numberOfLines={2}>{item.title}</Text>
-              <Text style={fy.cardDj} numberOfLines={1}>{item.dj_name ?? 'DJ'}</Text>
-              <View style={fy.cardFooter}>
-                {item.genre && <Text style={fy.cardGenre}>{item.genre}</Text>}
-                <View style={fy.likeRow}>
-                  <Ionicons name="heart" size={10} color={C.critical} />
-                  <Text style={fy.likeCount}>{item.like_count}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          );
-        }}
-      />
-    </View>
+    <FlatList
+      data={picks}
+      keyExtractor={m => m.id}
+      contentContainerStyle={{ padding: 16, gap: 12 }}
+      showsVerticalScrollIndicator={false}
+      removeClippedSubviews
+      maxToRenderPerBatch={6}
+      windowSize={5}
+      initialNumToRender={6}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+      ListHeaderComponent={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <Ionicons name="sparkles" size={13} color={C.accent} />
+          <Text style={{ fontSize: 12, color: C.textMuted, fontWeight: '600' }}>
+            {userGenre ? `Based on your ${userGenre} taste` : 'Top mixes right now'}
+          </Text>
+        </View>
+      }
+      renderItem={({ item }) => (
+        <MixCard mix={item} session={session} onRefresh={load} />
+      )}
+    />
   );
 }
-
-const fy = StyleSheet.create({
-  wrap: { marginBottom: 8 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 10 },
-  heading: { fontSize: 13, fontWeight: '700', color: C.text, flex: 1 },
-  genreTag: { fontSize: 11, fontWeight: '600', color: C.accent, backgroundColor: C.accentDim + '30', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: C.accentDim },
-  card: { width: 150, backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, gap: 5 },
-  platformDot: { width: 6, height: 6, borderRadius: 3 },
-  cardTitle: { fontSize: 13, fontWeight: '700', color: C.text, lineHeight: 18 },
-  cardDj: { fontSize: 11, color: C.textSec },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  cardGenre: { fontSize: 10, color: C.textMuted, flex: 1 },
-  likeRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  likeCount: { fontSize: 10, color: C.textMuted },
-});
 
 // ─── Gig Countdown Banner ─────────────────────────────────────────────────────
 function GigCountdownBanner({ userId }: { userId: string }) {
@@ -673,7 +652,7 @@ export default function MixesScreen() {
   const [filter, setFilter] = useState<'all' | 'set' | 'track'>('all');
   const [genre, setGenre] = useState('All');
   const [search, setSearch] = useState('');
-  const [feedMode, setFeedMode] = useState<'forYou' | 'following'>('forYou');
+  const [feedMode, setFeedMode] = useState<'all' | 'forYou' | 'following'>('all');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -696,7 +675,6 @@ export default function MixesScreen() {
     if (feedMode === 'following' && followingIds.length > 0) {
       mixQuery = mixQuery.in('user_id', followingIds);
     }
-
     const [mixRes, trackRes] = await Promise.all([
       mixQuery,
       filter === 'set' ? Promise.resolve({ data: [] }) :
@@ -760,18 +738,17 @@ export default function MixesScreen() {
 
       {/* Feed mode switcher */}
       <View style={s.feedSwitcher}>
-        <TouchableOpacity
-          style={[s.feedTab, feedMode === 'forYou' && s.feedTabActive]}
-          onPress={() => setFeedMode('forYou')}
-        >
-          <Text style={[s.feedTabText, feedMode === 'forYou' && s.feedTabTextActive]}>For You</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.feedTab, feedMode === 'following' && s.feedTabActive]}
-          onPress={() => setFeedMode('following')}
-        >
-          <Text style={[s.feedTabText, feedMode === 'following' && s.feedTabTextActive]}>Following</Text>
-        </TouchableOpacity>
+        {(['all', 'forYou', 'following'] as const).map(mode => (
+          <TouchableOpacity
+            key={mode}
+            style={[s.feedTab, feedMode === mode && s.feedTabActive]}
+            onPress={() => setFeedMode(mode)}
+          >
+            <Text style={[s.feedTabText, feedMode === mode && s.feedTabTextActive]}>
+              {mode === 'all' ? 'All' : mode === 'forYou' ? 'For You ✦' : 'Following'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Gig countdown */}
@@ -819,13 +796,21 @@ export default function MixesScreen() {
         ))}
       </ScrollView>
 
-      {/* For You strip */}
-      {!loading && user && feedMode === 'forYou' && (
-        <ForYouStrip userId={user.id} userGenre={profile?.genre ?? null} />
+      {/* For You full feed */}
+      {feedMode === 'forYou' && (
+        session ? (
+          <ForYouFeed userId={user!.id} userGenre={profile?.genre ?? null} session={session} />
+        ) : (
+          <View style={s.empty}>
+            <Ionicons name="sparkles-outline" size={48} color={C.textMuted} />
+            <Text style={s.emptyTitle}>Sign in for a personalised feed</Text>
+            <Text style={s.emptyBody}>We'll recommend mixes based on your genre and listening history.</Text>
+          </View>
+        )
       )}
 
-      {/* Feed */}
-      {loading ? (
+      {/* All / Following feed */}
+      {feedMode !== 'forYou' && (loading ? (
         <FlatList
           data={[1, 2, 3, 4, 5]}
           keyExtractor={i => String(i)}
@@ -878,7 +863,7 @@ export default function MixesScreen() {
               : <MixCard mix={item as Mix & { _kind: 'mix' }} session={session} onRefresh={fetchMixes} />
           )}
         />
-      )}
+      ))}
     </SafeAreaView>
   );
 }
